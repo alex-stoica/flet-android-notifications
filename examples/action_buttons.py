@@ -6,6 +6,9 @@ from flet_android_notifications import FletAndroidNotifications, NotificationErr
 
 
 def main(page: ft.Page):
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+
     status = ft.Text("No response yet", size=16)
 
     def on_notification_tap(e):
