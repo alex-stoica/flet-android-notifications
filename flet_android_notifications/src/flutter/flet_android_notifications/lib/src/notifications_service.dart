@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flet/flet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificationsService extends FletService {
   NotificationsService({required super.control});
@@ -29,6 +31,8 @@ class NotificationsService extends FletService {
     _initCompleter = Completer<bool>();
 
     try {
+      tz_data.initializeTimeZones();
+
       const androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const initSettings = InitializationSettings(android: androidSettings);
@@ -95,6 +99,73 @@ class NotificationsService extends FletService {
     }
   }
 
+  AndroidScheduleMode _parseAndroidScheduleMode(String value) {
+    switch (value) {
+      case "alarm_clock":
+        return AndroidScheduleMode.alarmClock;
+      case "exact":
+        return AndroidScheduleMode.exact;
+      case "exact_allow_while_idle":
+        return AndroidScheduleMode.exactAllowWhileIdle;
+      case "inexact":
+        return AndroidScheduleMode.inexact;
+      case "inexact_allow_while_idle":
+        return AndroidScheduleMode.inexactAllowWhileIdle;
+      default:
+        return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+  }
+
+  DateTimeComponents? _parseDateTimeComponents(String? value) {
+    if (value == null) return null;
+    switch (value) {
+      case "time":
+        return DateTimeComponents.time;
+      case "day_of_week_and_time":
+        return DateTimeComponents.dayOfWeekAndTime;
+      case "day_of_month_and_time":
+        return DateTimeComponents.dayOfMonthAndTime;
+      case "date_and_time":
+        return DateTimeComponents.dateAndTime;
+      default:
+        return null;
+    }
+  }
+
+  NotificationDetails _buildNotificationDetails({
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required Importance importance,
+    required Priority priority,
+    required bool playSound,
+    required bool enableVibration,
+    required List<AndroidNotificationAction> actions,
+  }) {
+    final androidDetails = AndroidNotificationDetails(
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
+      importance: importance,
+      priority: priority,
+      playSound: playSound,
+      enableVibration: enableVibration,
+      actions: actions,
+    );
+    return NotificationDetails(android: androidDetails);
+  }
+
+  List<AndroidNotificationAction> _parseActions(List<dynamic> raw) {
+    return raw
+        .map((action) => AndroidNotificationAction(
+              action["id"] as String,
+              action["title"] as String,
+              cancelNotification: true,
+              showsUserInterface: true,
+            ))
+        .toList();
+  }
+
   Future<dynamic> _onMethod(String name, dynamic args) async {
     try {
       switch (name) {
@@ -113,14 +184,30 @@ class NotificationsService extends FletService {
             priority: _priorityFromImportance(importance),
             playSound: a["play_sound"] as bool,
             enableVibration: a["enable_vibration"] as bool,
-            actions: (a["actions"] as List<dynamic>)
-                .map((action) => AndroidNotificationAction(
-                      action["id"] as String,
-                      action["title"] as String,
-                      cancelNotification: true,
-                      showsUserInterface: true,
-                    ))
-                .toList(),
+            actions: _parseActions(a["actions"] as List<dynamic>),
+          );
+          return "ok";
+        case "schedule_notification":
+          final a = Map<String, dynamic>.from(args as Map);
+          final importance = _parseImportance(a["importance"] as String);
+          await _scheduleNotification(
+            a["id"] as int,
+            a["title"] as String,
+            a["body"] as String,
+            scheduledEpochMs: a["scheduled_epoch_ms"] as int,
+            payload: a["payload"] as String,
+            channelId: a["channel_id"] as String,
+            channelName: a["channel_name"] as String,
+            channelDescription: a["channel_description"] as String,
+            importance: importance,
+            priority: _priorityFromImportance(importance),
+            playSound: a["play_sound"] as bool,
+            enableVibration: a["enable_vibration"] as bool,
+            actions: _parseActions(a["actions"] as List<dynamic>),
+            scheduleMode: _parseAndroidScheduleMode(
+                a["schedule_mode"] as String),
+            matchDateTimeComponents: _parseDateTimeComponents(
+                a["match_date_time_components"] as String?),
           );
           return "ok";
         case "cancel":
@@ -132,6 +219,9 @@ class NotificationsService extends FletService {
           return "ok";
         case "request_permissions":
           final granted = await _requestPermissions();
+          return granted.toString();
+        case "request_exact_alarm_permission":
+          final granted = await _requestExactAlarmPermission();
           return granted.toString();
       }
       return null;
@@ -157,9 +247,9 @@ class NotificationsService extends FletService {
     await _ensureInitialized();
     _lastShowTime = DateTime.now();
 
-    final androidDetails = AndroidNotificationDetails(
-      channelId,
-      channelName,
+    final details = _buildNotificationDetails(
+      channelId: channelId,
+      channelName: channelName,
       channelDescription: channelDescription,
       importance: importance,
       priority: priority,
@@ -167,9 +257,55 @@ class NotificationsService extends FletService {
       enableVibration: enableVibration,
       actions: actions,
     );
-    final details = NotificationDetails(android: androidDetails);
 
     await _plugin.show(id, title, body, details, payload: payload);
+  }
+
+  Future<void> _scheduleNotification(
+    int id,
+    String title,
+    String body, {
+    required int scheduledEpochMs,
+    required String payload,
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required Importance importance,
+    required Priority priority,
+    required bool playSound,
+    required bool enableVibration,
+    required List<AndroidNotificationAction> actions,
+    required AndroidScheduleMode scheduleMode,
+    required DateTimeComponents? matchDateTimeComponents,
+  }) async {
+    await _ensureInitialized();
+
+    final scheduledDate = tz.TZDateTime.from(
+      DateTime.fromMillisecondsSinceEpoch(scheduledEpochMs, isUtc: true),
+      tz.local,
+    );
+
+    final details = _buildNotificationDetails(
+      channelId: channelId,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      importance: importance,
+      priority: priority,
+      playSound: playSound,
+      enableVibration: enableVibration,
+      actions: actions,
+    );
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduledDate,
+      details,
+      androidScheduleMode: scheduleMode,
+      payload: payload,
+      matchDateTimeComponents: matchDateTimeComponents,
+    );
   }
 
   Future<bool> _requestPermissions() async {
@@ -180,6 +316,17 @@ class NotificationsService extends FletService {
     if (android == null) return false;
 
     final granted = await android.requestNotificationsPermission();
+    return granted ?? false;
+  }
+
+  Future<bool> _requestExactAlarmPermission() async {
+    await _ensureInitialized();
+
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return false;
+
+    final granted = await android.requestExactAlarmsPermission();
     return granted ?? false;
   }
 }

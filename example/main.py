@@ -1,190 +1,130 @@
 import json
-import time
+from datetime import datetime, timedelta
 import flet as ft
 from flet_android_notifications import FletAndroidNotifications, NotificationError
 
 
 def main(page: ft.Page):
-    page.title = "Notification Test"
+    page.title = "Schedule Test"
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.padding = 20
 
-    notification_counter = {"value": 0}
-    last_send_time = {"value": 0.0}
+    log = ft.Text("", size=12, color=ft.Colors.GREY)
 
-    status_colors = {
-        "pending": ft.Colors.YELLOW,
-        "solved": ft.Colors.GREEN,
-        "failed": ft.Colors.RED,
-    }
-
-    status_indicator = ft.Container(
-        width=30,
-        height=30,
-        border_radius=15,
-        bgcolor=ft.Colors.GREY,
-    )
-
-    status_text = ft.Text("No status", size=16)
-    log_text = ft.Text("", size=12, color=ft.Colors.GREY)
-
-    def update_status(new_status):
-        status_indicator.bgcolor = status_colors.get(new_status, ft.Colors.GREY)
-        status_text.value = new_status.capitalize()
+    def add_log(msg):
+        log.value = f"{msg}\n{log.value}"[:500]
         page.update()
-
-    def on_solve(e):
-        update_status("solved")
-        bottom_sheet.open = False
-        page.update()
-
-    def on_postpone(e):
-        update_status("pending")
-        bottom_sheet.open = False
-        page.update()
-
-    def on_fail(e):
-        update_status("failed")
-        bottom_sheet.open = False
-        page.update()
-
-    bottom_sheet = ft.BottomSheet(
-        content=ft.Container(
-            padding=20,
-            content=ft.Column(
-                tight=True,
-                controls=[
-                    ft.Text("Task Notification", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("What would you like to do?"),
-                    ft.Divider(),
-                    ft.Button(
-                        content="Solve",
-                        icon=ft.Icons.CHECK_CIRCLE,
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.GREEN,
-                        on_click=on_solve,
-                        width=200,
-                    ),
-                    ft.Button(
-                        content="Postpone",
-                        icon=ft.Icons.SCHEDULE,
-                        color=ft.Colors.BLACK,
-                        bgcolor=ft.Colors.YELLOW,
-                        on_click=on_postpone,
-                        width=200,
-                    ),
-                    ft.Button(
-                        content="Mark as Failed",
-                        icon=ft.Icons.CANCEL,
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.RED,
-                        on_click=on_fail,
-                        width=200,
-                    ),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-        ),
-    )
 
     def on_notification_tap(e):
-        try:
-            data = json.loads(e.data)
-            payload = data.get("payload", "")
-            action_id = data.get("action_id", "")
-        except (json.JSONDecodeError, TypeError):
-            payload = e.data or ""
-            action_id = ""
-
-        # Only debounce body taps (Samsung phantom tap workaround).
-        # Action button presses are always intentional.
-        if not action_id:
-            elapsed = time.time() - last_send_time["value"]
-            if elapsed < 3:
-                return
-
+        data = json.loads(e.data)
+        payload = data.get("payload", "")
+        action_id = data.get("action_id", "")
         if action_id:
-            log_text.value = f"Action: {action_id} | Payload: {payload}"
-            if action_id == "approve":
-                update_status("solved")
-            elif action_id == "deny":
-                update_status("failed")
-            page.update()
+            add_log(f"ACTION: {action_id} | payload={payload}")
         else:
-            log_text.value = f"Tapped! Payload: {payload}"
-            bottom_sheet.open = True
-            page.update()
+            add_log(f"TAP: payload={payload}")
 
     notifications = FletAndroidNotifications(
         on_notification_tap=on_notification_tap,
     )
 
-    page.overlay.append(bottom_sheet)
-
-    async def send_notification(e):
-        log_text.value = "Requesting permissions..."
-        page.update()
-
+    async def request_perms(e):
         try:
-            result = await notifications.request_permissions()
-            log_text.value = f"Permission result: {result}"
-            page.update()
+            r = await notifications.request_permissions()
+            add_log(f"Notification permission: {r}")
         except NotificationError as ex:
-            log_text.value = f"Permission error: {ex}"
-            page.update()
-            return
+            add_log(f"Perm error: {ex}")
 
-        notification_counter["value"] += 1
-        last_send_time["value"] = time.time()
+    async def request_alarm_perm(e):
         try:
-            result = await notifications.show_notification(
-                notification_id=notification_counter["value"],
-                title="Task Notification",
-                body="You have a task to review! Tap to respond.",
-                payload=f"task_{notification_counter['value']}",
-                actions=[
-                    {"id": "approve", "title": "Approve"},
-                    {"id": "deny", "title": "Deny"},
-                ],
-                channel_id="task_alerts",
-                channel_name="Task Alerts",
-                channel_description="Alerts for pending tasks",
+            r = await notifications.request_exact_alarm_permission()
+            add_log(f"Exact alarm permission: {r}")
+        except NotificationError as ex:
+            add_log(f"Alarm perm error: {ex}")
+
+    async def show_now(e):
+        try:
+            await notifications.show_notification(
+                notification_id=1,
+                title="Instant",
+                body="This showed immediately.",
+                payload="instant",
             )
-            log_text.value = f"Sent #{notification_counter['value']}"
-            page.update()
+            add_log("Showed instant notification")
         except NotificationError as ex:
-            log_text.value = f"Send error: {ex}"
-            page.update()
+            add_log(f"Show error: {ex}")
 
-    async def show_sheet_directly(e):
-        bottom_sheet.open = True
-        page.update()
+    async def schedule_10s(e):
+        fire_at = datetime.now() + timedelta(seconds=10)
+        try:
+            await notifications.schedule_notification(
+                notification_id=10,
+                title="10s Timer",
+                body=f"Scheduled for {fire_at.strftime('%H:%M:%S')}",
+                scheduled_time=fire_at,
+                payload="scheduled_10s",
+            )
+            add_log(f"Scheduled for {fire_at.strftime('%H:%M:%S')} (10s)")
+        except NotificationError as ex:
+            add_log(f"Schedule error: {ex}")
+
+    async def schedule_30s(e):
+        fire_at = datetime.now() + timedelta(seconds=30)
+        try:
+            await notifications.schedule_notification(
+                notification_id=30,
+                title="30s Timer",
+                body=f"Scheduled for {fire_at.strftime('%H:%M:%S')}",
+                scheduled_time=fire_at,
+                payload="scheduled_30s",
+            )
+            add_log(f"Scheduled for {fire_at.strftime('%H:%M:%S')} (30s)")
+        except NotificationError as ex:
+            add_log(f"Schedule error: {ex}")
+
+    async def schedule_exact_10s(e):
+        fire_at = datetime.now() + timedelta(seconds=10)
+        try:
+            await notifications.schedule_notification(
+                notification_id=11,
+                title="Exact 10s",
+                body=f"Exact alarm at {fire_at.strftime('%H:%M:%S')}",
+                scheduled_time=fire_at,
+                payload="exact_10s",
+                schedule_mode="exact_allow_while_idle",
+            )
+            add_log(f"Exact scheduled for {fire_at.strftime('%H:%M:%S')}")
+        except NotificationError as ex:
+            add_log(f"Exact schedule error: {ex}")
+
+    async def cancel_all(e):
+        try:
+            await notifications.cancel_all()
+            add_log("Cancelled all")
+        except NotificationError as ex:
+            add_log(f"Cancel error: {ex}")
 
     page.add(
         ft.Column(
             controls=[
-                ft.Row(
-                    controls=[status_indicator, status_text],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                ),
-                ft.Container(height=30),
-                ft.Button(
-                    content="Send Native Notification",
-                    icon=ft.Icons.NOTIFICATIONS,
-                    on_click=send_notification,
-                    style=ft.ButtonStyle(padding=20),
-                ),
+                ft.Text("Scheduled Notifications Test", size=20, weight=ft.FontWeight.BOLD),
                 ft.Container(height=10),
-                ft.Button(
-                    content="Open Sheet (In-App)",
-                    icon=ft.Icons.ARROW_UPWARD,
-                    on_click=show_sheet_directly,
-                    style=ft.ButtonStyle(padding=10),
-                ),
+                ft.Button(content="Request Notification Permission", on_click=request_perms),
+                ft.Button(content="Request Exact Alarm Permission", on_click=request_alarm_perm),
+                ft.Divider(),
+                ft.Button(content="Show Now (instant)", on_click=show_now),
+                ft.Button(content="Schedule in 10s (inexact)", on_click=schedule_10s),
+                ft.Button(content="Schedule in 30s (inexact)", on_click=schedule_30s),
+                ft.Button(content="Schedule in 10s (exact)", on_click=schedule_exact_10s),
+                ft.Divider(),
+                ft.Button(content="Cancel All", on_click=cancel_all, bgcolor=ft.Colors.RED, color=ft.Colors.WHITE),
                 ft.Container(height=10),
-                log_text,
+                ft.Text("Log:", weight=ft.FontWeight.BOLD),
+                log,
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=5,
         )
     )
 
