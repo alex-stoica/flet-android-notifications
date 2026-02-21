@@ -20,7 +20,7 @@ build-backend = "setuptools.build_meta"
 "android.permission.POST_NOTIFICATIONS" = true
 
 [tool.flet.app]
-exclude = ["flet_android_notifications", ".claude"]
+exclude = ["flet_android_notifications"]
 
 [tool.flet.dev_packages]
 flet-android-notifications = "flet_android_notifications"

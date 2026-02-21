@@ -11,5 +11,5 @@ build/
 # Lockfile
 uv.lock
 
-# Claude
+# IDE / tool config
 .claude/
