@@ -50,6 +50,7 @@ The `exclude` line prevents the extension source from being raw-copied into the 
 
 ```python
 import json
+from datetime import datetime, timedelta
 import flet as ft
 from flet_android_notifications import FletAndroidNotifications, NotificationError
 
@@ -60,36 +61,49 @@ def main(page: ft.Page):
         data = json.loads(e.data)
         payload = data.get("payload", "")
         action_id = data.get("action_id", "")
-
-        if action_id == "approve":
-            print(f"approved: {payload}")
-        elif action_id == "deny":
-            print(f"denied: {payload}")
-        else:
-            print(f"notification body tapped: {payload}")
+        print(f"tapped: payload={payload}, action={action_id}")
 
     notifications = FletAndroidNotifications(
         on_notification_tap=on_notification_tap,
     )
 
-    async def send(e):
+    async def send_now(e):
         await notifications.request_permissions()
+        await notifications.show_notification(
+            notification_id=1,
+            title="Hello",
+            body="This is an instant notification.",
+        )
 
-        try:
-            await notifications.show_notification(
-                notification_id=1,
-                title="New task",
-                body="You have a task to review.",
-                payload="task_42",
-                actions=[
-                    {"id": "approve", "title": "Approve"},
-                    {"id": "deny", "title": "Deny"},
-                ],
-            )
-        except NotificationError as ex:
-            print(f"failed: {ex}")
+    async def send_with_actions(e):
+        await notifications.request_permissions()
+        await notifications.show_notification(
+            notification_id=2,
+            title="Review request",
+            body="You have a task to review.",
+            payload="task_42",
+            actions=[
+                {"id": "approve", "title": "Approve"},
+                {"id": "deny", "title": "Deny"},
+            ],
+        )
 
-    page.add(ft.Button(content="Send notification", on_click=send))
+    async def schedule_30s(e):
+        await notifications.request_permissions()
+        await notifications.schedule_notification(
+            notification_id=10,
+            title="Reminder",
+            body="This fired 30 seconds after you pressed the button.",
+            scheduled_time=datetime.now() + timedelta(seconds=30),
+        )
+
+    page.add(
+        ft.Column([
+            ft.Button(content="Send now", on_click=send_now),
+            ft.Button(content="Send with actions", on_click=send_with_actions),
+            ft.Button(content="Schedule in 30s", on_click=schedule_30s),
+        ])
+    )
 
 
 ft.run(main)
@@ -97,37 +111,7 @@ ft.run(main)
 
 Just instantiate `FletAndroidNotifications`. Do not add it to `page.overlay` or `page.controls` -- it's a service, not a visual control, and it registers itself automatically.
 
-### Scheduling a notification
-
-```python
-from datetime import datetime, timedelta
-from flet_android_notifications import FletAndroidNotifications
-
-notifications = FletAndroidNotifications()
-
-async def schedule(e):
-    await notifications.request_permissions()
-
-    # One-shot: fire 30 seconds from now
-    await notifications.schedule_notification(
-        notification_id=10,
-        title="Reminder",
-        body="Time to check in!",
-        scheduled_time=datetime.now() + timedelta(seconds=30),
-    )
-
-    # Daily recurring: fire at the same time every day
-    await notifications.schedule_notification(
-        notification_id=11,
-        title="Daily standup",
-        body="Standup starts in 5 minutes.",
-        scheduled_time=datetime.now() + timedelta(minutes=5),
-        match_date_time_components="time",
-    )
-
-    # Cancel a scheduled notification (same as cancelling a shown one)
-    await notifications.cancel(10)
-```
+See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py).
 
 ## API
 
