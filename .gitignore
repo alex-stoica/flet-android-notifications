@@ -11,5 +11,8 @@ build/
 # Lockfile
 uv.lock
 
+# Secrets
+.env
+
 # IDE / tool config
 .claude/
