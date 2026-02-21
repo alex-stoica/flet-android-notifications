@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[oc]
+*.egg-info
+dist/
+build/
+
+# Virtual environments
+.venv
+
+# Lockfile
+uv.lock
+
+# Claude
+.claude/

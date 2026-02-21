@@ -1,0 +1,35 @@
+[project]
+name = "flet-android-notifications"
+version = "0.1.0"
+description = "Native local notifications for Flet apps (Android)"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Alex Stoica", email = "alexstoica@protonmail.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "flet>=0.80.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/alex-stoica/flet-android-notifications"
+Repository = "https://github.com/alex-stoica/flet-android-notifications"
+Issues = "https://github.com/alex-stoica/flet-android-notifications/issues"
+
+[tool.setuptools.package-data]
+"flutter.flet_android_notifications" = ["**/*"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
