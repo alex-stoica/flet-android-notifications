@@ -1,1 +1,7 @@
-from .flet_android_notifications import FletAndroidNotifications, NotificationError
+from .flet_android_notifications import (
+    FletAndroidNotifications,
+    NotificationError,
+    BigTextStyle,
+    BigPictureStyle,
+    InboxStyle,
+)

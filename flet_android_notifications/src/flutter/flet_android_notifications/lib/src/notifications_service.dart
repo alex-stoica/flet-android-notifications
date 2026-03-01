@@ -132,6 +132,53 @@ class NotificationsService extends FletService {
     }
   }
 
+  StyleInformation? _parseStyleInformation(Map<String, dynamic>? style) {
+    if (style == null) return null;
+    switch (style["type"]) {
+      case "big_text":
+        return BigTextStyleInformation(
+          style["big_text"] as String,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+        );
+      case "big_picture":
+        final bitmapType = style["bitmap_type"] as String;
+        final bitmapValue = style["bitmap_value"] as String;
+        AndroidBitmap<Object> bitmap;
+        if (bitmapType == "file_path") {
+          bitmap = FilePathAndroidBitmap(bitmapValue);
+        } else {
+          bitmap = DrawableResourceAndroidBitmap(bitmapValue);
+        }
+        AndroidBitmap<Object>? largeIcon;
+        if (style["large_icon_type"] != null) {
+          final iconType = style["large_icon_type"] as String;
+          final iconValue = style["large_icon_value"] as String;
+          if (iconType == "file_path") {
+            largeIcon = FilePathAndroidBitmap(iconValue);
+          } else {
+            largeIcon = DrawableResourceAndroidBitmap(iconValue);
+          }
+        }
+        return BigPictureStyleInformation(
+          bitmap,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+          largeIcon: largeIcon,
+          hideExpandedLargeIcon: style["hide_expanded_large_icon"] as bool? ?? false,
+        );
+      case "inbox":
+        final lines = (style["lines"] as List<dynamic>).cast<String>();
+        return InboxStyleInformation(
+          lines,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+        );
+      default:
+        return null;
+    }
+  }
+
   NotificationDetails _buildNotificationDetails({
     required String channelId,
     required String channelName,
@@ -141,6 +188,11 @@ class NotificationsService extends FletService {
     required bool playSound,
     required bool enableVibration,
     required List<AndroidNotificationAction> actions,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -151,6 +203,11 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -172,6 +229,9 @@ class NotificationsService extends FletService {
         case "show_notification":
           final a = Map<String, dynamic>.from(args as Map);
           final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
           await _showNotification(
             a["id"] as int,
             a["title"] as String,
@@ -185,11 +245,19 @@ class NotificationsService extends FletService {
             playSound: a["play_sound"] as bool,
             enableVibration: a["enable_vibration"] as bool,
             actions: _parseActions(a["actions"] as List<dynamic>),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
           );
           return "ok";
         case "schedule_notification":
           final a = Map<String, dynamic>.from(args as Map);
           final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
           await _scheduleNotification(
             a["id"] as int,
             a["title"] as String,
@@ -208,6 +276,11 @@ class NotificationsService extends FletService {
                 a["schedule_mode"] as String),
             matchDateTimeComponents: _parseDateTimeComponents(
                 a["match_date_time_components"] as String?),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
           );
           return "ok";
         case "cancel":
@@ -243,8 +316,16 @@ class NotificationsService extends FletService {
     required bool playSound,
     required bool enableVibration,
     required List<AndroidNotificationAction> actions,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
   }) async {
-    await _ensureInitialized();
+    final initialized = await _ensureInitialized();
+    if (!initialized) {
+      throw Exception('Notification plugin failed to initialize');
+    }
     _lastShowTime = DateTime.now();
 
     final details = _buildNotificationDetails(
@@ -256,6 +337,11 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
     );
 
     await _plugin.show(id, title, body, details, payload: payload);
@@ -277,8 +363,16 @@ class NotificationsService extends FletService {
     required List<AndroidNotificationAction> actions,
     required AndroidScheduleMode scheduleMode,
     required DateTimeComponents? matchDateTimeComponents,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
   }) async {
-    await _ensureInitialized();
+    final initialized = await _ensureInitialized();
+    if (!initialized) {
+      throw Exception('Notification plugin failed to initialize');
+    }
 
     final scheduledDate = tz.TZDateTime.from(
       DateTime.fromMillisecondsSinceEpoch(scheduledEpochMs, isUtc: true),
@@ -294,6 +388,11 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
     );
 
     await _plugin.zonedSchedule(
