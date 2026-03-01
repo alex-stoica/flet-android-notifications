@@ -1,9 +1,9 @@
 [project]
 name = "flet-android-notifications"
-version = "0.2.0"
+version = "0.4.0"
 description = "Native local notifications for Flet apps (Android)"
 requires-python = ">=3.10"
-readme = "README.md"
+readme = {text = "See [README on GitHub](https://github.com/alex-stoica/flet-android-notifications) for full documentation.", content-type = "text/markdown"}
 license = "MIT"
 authors = [
     {name = "Alex Stoica", email = "alexstoica@protonmail.com"},

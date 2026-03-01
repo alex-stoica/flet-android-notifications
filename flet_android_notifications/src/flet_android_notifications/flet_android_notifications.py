@@ -1,13 +1,128 @@
-import json
-from datetime import datetime, timezone
+from datetime import datetime
 import flet as ft
-from typing import Optional
+from typing import Optional, Union
 
 
 class NotificationError(Exception):
     """Raised when a notification operation fails on the native side."""
 
     pass
+
+
+class BigTextStyle:
+    """Expandable big text notification style.
+
+    When the notification is expanded, shows the full big_text content
+    instead of the truncated body.
+    """
+
+    def __init__(
+        self,
+        big_text: str,
+        *,
+        content_title: Optional[str] = None,
+        summary_text: Optional[str] = None,
+    ):
+        self.big_text = big_text
+        self.content_title = content_title
+        self.summary_text = summary_text
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "big_text",
+            "big_text": self.big_text,
+            "content_title": self.content_title,
+            "summary_text": self.summary_text,
+        }
+
+
+class BigPictureStyle:
+    """Notification style that shows a large image when expanded.
+
+    Provide exactly one of file_path or drawable_resource for the main image.
+    Optionally provide a large icon via large_icon_file_path or large_icon_drawable_resource.
+    """
+
+    def __init__(
+        self,
+        *,
+        file_path: Optional[str] = None,
+        drawable_resource: Optional[str] = None,
+        content_title: Optional[str] = None,
+        summary_text: Optional[str] = None,
+        large_icon_file_path: Optional[str] = None,
+        large_icon_drawable_resource: Optional[str] = None,
+        hide_expanded_large_icon: bool = False,
+    ):
+        if file_path and drawable_resource:
+            raise ValueError("provide exactly one of file_path or drawable_resource, not both")
+        if not file_path and not drawable_resource:
+            raise ValueError("provide exactly one of file_path or drawable_resource")
+        self.file_path = file_path
+        self.drawable_resource = drawable_resource
+        self.content_title = content_title
+        self.summary_text = summary_text
+        self.large_icon_file_path = large_icon_file_path
+        self.large_icon_drawable_resource = large_icon_drawable_resource
+        self.hide_expanded_large_icon = hide_expanded_large_icon
+
+    def to_dict(self) -> dict:
+        bitmap_type = "file_path" if self.file_path else "drawable_resource"
+        bitmap_value = self.file_path or self.drawable_resource
+        d = {
+            "type": "big_picture",
+            "bitmap_type": bitmap_type,
+            "bitmap_value": bitmap_value,
+            "content_title": self.content_title,
+            "summary_text": self.summary_text,
+            "hide_expanded_large_icon": self.hide_expanded_large_icon,
+        }
+        if self.large_icon_file_path:
+            d["large_icon_type"] = "file_path"
+            d["large_icon_value"] = self.large_icon_file_path
+        elif self.large_icon_drawable_resource:
+            d["large_icon_type"] = "drawable_resource"
+            d["large_icon_value"] = self.large_icon_drawable_resource
+        return d
+
+
+class InboxStyle:
+    """Notification style that shows a list of text lines when expanded."""
+
+    def __init__(
+        self,
+        lines: list[str],
+        *,
+        content_title: Optional[str] = None,
+        summary_text: Optional[str] = None,
+    ):
+        self.lines = lines
+        self.content_title = content_title
+        self.summary_text = summary_text
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "inbox",
+            "lines": self.lines,
+            "content_title": self.content_title,
+            "summary_text": self.summary_text,
+        }
+
+
+NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
+
+
+def _validate_color_hex(color: str) -> None:
+    """Validate a hex color string like '#FF5722' or '#80FF5722'."""
+    if not color.startswith("#"):
+        raise ValueError(f"color must start with '#', got: {color!r}")
+    hex_part = color[1:]
+    if len(hex_part) not in (6, 8):
+        raise ValueError(f"color must be 6 or 8 hex digits after '#', got: {color!r}")
+    try:
+        int(hex_part, 16)
+    except ValueError:
+        raise ValueError(f"color contains invalid hex characters: {color!r}")
 
 
 @ft.control("flet_android_notifications")
@@ -34,6 +149,20 @@ class FletAndroidNotifications(ft.Service):
         importance: str = "high",
         play_sound: bool = True,
         enable_vibration: bool = True,
+        style: Optional[NotificationStyle] = None,
+        show_progress: bool = False,
+        max_progress: int = 0,
+        progress: int = 0,
+        indeterminate: bool = False,
+        group_key: Optional[str] = None,
+        set_as_group_summary: bool = False,
+        group_alert_behavior: str = "all",
+        icon: Optional[str] = None,
+        large_icon: Optional[str] = None,
+        large_icon_type: str = "drawable_resource",
+        color: Optional[str] = None,
+        colorized: bool = False,
+        sound: Optional[str] = None,
     ):
         """Show an Android notification.
 
@@ -53,10 +182,36 @@ class FletAndroidNotifications(ft.Service):
             importance: One of "none", "min", "low", "default", "high", "max".
             play_sound: Whether to play the default notification sound.
             enable_vibration: Whether to vibrate on notification.
+            style: Notification style (BigTextStyle, BigPictureStyle, or InboxStyle).
+            show_progress: Whether to show a progress bar.
+            max_progress: Maximum progress value (0 = indeterminate when show_progress is True).
+            progress: Current progress value.
+            indeterminate: Whether the progress bar is indeterminate.
+            group_key: Group key for bundling notifications together.
+            set_as_group_summary: If True, this notification is the group
+                summary. You must manage summary lifecycle yourself.
+            group_alert_behavior: "all", "summary", or "children".
+            icon: Drawable resource name for the small status bar icon
+                (e.g. "ic_notification"). None = app launcher icon. Must
+                be a compiled Android drawable, not a file path. Android
+                renders small icons as single-color silhouettes.
+            large_icon: Large icon shown on the notification's right side.
+                Interpreted according to large_icon_type.
+            large_icon_type: "drawable_resource" (default) or "file_path".
+            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
+                the accent color, which also tints the small icon.
+            colorized: When True, applies color as background. Only works
+                on foreground service / media-style notifications.
+            sound: Raw resource name (e.g. "alert_tone" for
+                res/raw/alert_tone.mp3). Omit file extension. The sound
+                is permanently bound to the channel at creation — changing
+                it later requires a different channel_id.
 
         Raises:
             NotificationError: If the native side reports an error.
         """
+        if color is not None:
+            _validate_color_hex(color)
         result = await self._invoke_method(
             method_name="show_notification",
             arguments={
@@ -71,6 +226,20 @@ class FletAndroidNotifications(ft.Service):
                 "importance": importance,
                 "play_sound": play_sound,
                 "enable_vibration": enable_vibration,
+                "style": style.to_dict() if style else None,
+                "show_progress": show_progress,
+                "max_progress": max_progress,
+                "progress": progress,
+                "indeterminate": indeterminate,
+                "group_key": group_key,
+                "set_as_group_summary": set_as_group_summary,
+                "group_alert_behavior": group_alert_behavior,
+                "icon": icon,
+                "large_icon": large_icon,
+                "large_icon_type": large_icon_type,
+                "color": color,
+                "colorized": colorized,
+                "sound": sound,
             },
         )
         return self._check_error(result)
@@ -92,6 +261,20 @@ class FletAndroidNotifications(ft.Service):
         enable_vibration: bool = True,
         schedule_mode: str = "inexact_allow_while_idle",
         match_date_time_components: Optional[str] = None,
+        style: Optional[NotificationStyle] = None,
+        show_progress: bool = False,
+        max_progress: int = 0,
+        progress: int = 0,
+        indeterminate: bool = False,
+        group_key: Optional[str] = None,
+        set_as_group_summary: bool = False,
+        group_alert_behavior: str = "all",
+        icon: Optional[str] = None,
+        large_icon: Optional[str] = None,
+        large_icon_type: str = "drawable_resource",
+        color: Optional[str] = None,
+        colorized: bool = False,
+        sound: Optional[str] = None,
     ):
         """Schedule an Android notification for a future time.
 
@@ -121,10 +304,36 @@ class FletAndroidNotifications(ft.Service):
                 "time" (daily), "day_of_week_and_time" (weekly),
                 "day_of_month_and_time" (monthly), "date_and_time" (yearly),
                 or None (one-shot, default).
+            style: Notification style (BigTextStyle, BigPictureStyle, or InboxStyle).
+            show_progress: Whether to show a progress bar.
+            max_progress: Maximum progress value (0 = indeterminate when show_progress is True).
+            progress: Current progress value.
+            indeterminate: Whether the progress bar is indeterminate.
+            group_key: Group key for bundling notifications together.
+            set_as_group_summary: If True, this notification is the group
+                summary. You must manage summary lifecycle yourself.
+            group_alert_behavior: "all", "summary", or "children".
+            icon: Drawable resource name for the small status bar icon
+                (e.g. "ic_notification"). None = app launcher icon. Must
+                be a compiled Android drawable, not a file path. Android
+                renders small icons as single-color silhouettes.
+            large_icon: Large icon shown on the notification's right side.
+                Interpreted according to large_icon_type.
+            large_icon_type: "drawable_resource" (default) or "file_path".
+            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
+                the accent color, which also tints the small icon.
+            colorized: When True, applies color as background. Only works
+                on foreground service / media-style notifications.
+            sound: Raw resource name (e.g. "alert_tone" for
+                res/raw/alert_tone.mp3). Omit file extension. The sound
+                is permanently bound to the channel at creation — changing
+                it later requires a different channel_id.
 
         Raises:
             NotificationError: If the native side reports an error.
         """
+        if color is not None:
+            _validate_color_hex(color)
         epoch_ms = int(scheduled_time.timestamp() * 1000)
         result = await self._invoke_method(
             method_name="schedule_notification",
@@ -143,6 +352,20 @@ class FletAndroidNotifications(ft.Service):
                 "enable_vibration": enable_vibration,
                 "schedule_mode": schedule_mode,
                 "match_date_time_components": match_date_time_components,
+                "style": style.to_dict() if style else None,
+                "show_progress": show_progress,
+                "max_progress": max_progress,
+                "progress": progress,
+                "indeterminate": indeterminate,
+                "group_key": group_key,
+                "set_as_group_summary": set_as_group_summary,
+                "group_alert_behavior": group_alert_behavior,
+                "icon": icon,
+                "large_icon": large_icon,
+                "large_icon_type": large_icon_type,
+                "color": color,
+                "colorized": colorized,
+                "sound": sound,
             },
         )
         return self._check_error(result)
@@ -174,7 +397,7 @@ class FletAndroidNotifications(ft.Service):
         """Request notification permissions (required on Android 13+).
 
         Returns:
-            "true" if granted, "false" if denied.
+            bool: True if granted, False if denied.
 
         Raises:
             NotificationError: If the native side reports an error.
@@ -182,7 +405,7 @@ class FletAndroidNotifications(ft.Service):
         result = await self._invoke_method(
             method_name="request_permissions",
         )
-        return self._check_error(result)
+        return self._check_error(result) == "true"
 
     async def request_exact_alarm_permission(self):
         """Request the SCHEDULE_EXACT_ALARM permission (Android 14+).
@@ -191,7 +414,7 @@ class FletAndroidNotifications(ft.Service):
         "exact_allow_while_idle"). Inexact modes do not need this permission.
 
         Returns:
-            "true" if granted, "false" if denied.
+            bool: True if granted, False if denied.
 
         Raises:
             NotificationError: If the native side reports an error.
@@ -199,4 +422,4 @@ class FletAndroidNotifications(ft.Service):
         result = await self._invoke_method(
             method_name="request_exact_alarm_permission",
         )
-        return self._check_error(result)
+        return self._check_error(result) == "true"

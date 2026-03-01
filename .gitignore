@@ -16,3 +16,6 @@ uv.lock
 
 # IDE / tool config
 .claude/
+
+# Local dev notes
+insights/

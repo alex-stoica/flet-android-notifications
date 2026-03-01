@@ -1,0 +1,20 @@
+[project]
+name = "flet-android-notifications-demo"
+version = "0.1.0"
+description = "Demo app for flet-android-notifications"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=0.80.5",
+    "flet-android-notifications",
+]
+
+[tool.flet.android.permission]
+"android.permission.POST_NOTIFICATIONS" = true
+"android.permission.SCHEDULE_EXACT_ALARM" = true
+"android.permission.RECEIVE_BOOT_COMPLETED" = true
+
+[tool.flet.app]
+exclude = ["flet_android_notifications"]
+
+[tool.flet.dev_packages]
+flet-android-notifications = "flet_android_notifications"

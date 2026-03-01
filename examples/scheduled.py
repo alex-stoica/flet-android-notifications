@@ -38,9 +38,12 @@ def main(page: ft.Page):
             print(f"failed: {ex}")
 
     async def cancel_all(e):
-        await notifications.cancel_all()
-        status.value = "All cancelled"
-        page.update()
+        try:
+            await notifications.cancel_all()
+            status.value = "All cancelled"
+            page.update()
+        except NotificationError as ex:
+            print(f"failed: {ex}")
 
     page.add(
         ft.Column(

@@ -11,6 +11,8 @@ Flet has no built-in support for native notifications, and every obvious Python 
 - notification action buttons (e.g. "Approve" / "Deny") with per-button callbacks
 - configurable notification channels (id, name, description, importance, sound, vibration)
 - tap and action callbacks with payload support
+- notification styles: big text, big picture, and inbox (expandable rich notifications)
+- progress bar notifications (determinate and indeterminate)
 - permission handling for Android 13+ and exact alarm permission for Android 14+
 - proper error propagation via `NotificationError`
 
@@ -111,7 +113,7 @@ ft.run(main)
 
 Just instantiate `FletAndroidNotifications`. Do not add it to `page.overlay` or `page.controls` -- it's a service, not a visual control, and it registers itself automatically.
 
-See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py).
+See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py), [`big_text.py`](examples/big_text.py), [`notification_styles.py`](examples/notification_styles.py).
 
 ## API
 
@@ -140,6 +142,20 @@ The service. Instantiate once. The `on_notification_tap` callback receives an ev
 | `importance` | `str` | `"high"` | one of `none`, `min`, `low`, `default`, `high`, `max` |
 | `play_sound` | `bool` | `True` | play default notification sound |
 | `enable_vibration` | `bool` | `True` | vibrate on notification |
+| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich notification style |
+| `show_progress` | `bool` | `False` | show a progress bar |
+| `max_progress` | `int` | `0` | maximum progress value |
+| `progress` | `int` | `0` | current progress value |
+| `indeterminate` | `bool` | `False` | indeterminate progress bar |
+| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
+| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
+| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
+| `icon` | `str\|None` | `None` | drawable resource name for small icon (e.g. `"ic_notification"`). None = app launcher icon. Android renders small icons as single-color silhouettes. |
+| `large_icon` | `str\|None` | `None` | large icon shown as thumbnail on right side |
+| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
+| `color` | `str\|None` | `None` | hex color (e.g. `"#FF5722"`) for accent color / small icon tint. See [Samsung color note](#samsung-oneui-notes). |
+| `colorized` | `bool` | `False` | apply color as background (foreground service / media-style only) |
+| `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"` for `res/raw/alert_tone.mp3`). Sound is permanently bound to the channel — changing it requires a different `channel_id`. |
 
 Raises `NotificationError` on failure.
 
@@ -161,6 +177,20 @@ Raises `NotificationError` on failure.
 | `enable_vibration` | `bool` | `True` | vibrate on notification |
 | `schedule_mode` | `str` | `"inexact_allow_while_idle"` | how Android schedules the alarm (see table below) |
 | `match_date_time_components` | `str\|None` | `None` | for recurring: `"time"` (daily), `"day_of_week_and_time"` (weekly), `"day_of_month_and_time"` (monthly), `"date_and_time"` (yearly), or `None` (one-shot) |
+| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich notification style |
+| `show_progress` | `bool` | `False` | show a progress bar |
+| `max_progress` | `int` | `0` | maximum progress value |
+| `progress` | `int` | `0` | current progress value |
+| `indeterminate` | `bool` | `False` | indeterminate progress bar |
+| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
+| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
+| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
+| `icon` | `str\|None` | `None` | drawable resource name for small icon |
+| `large_icon` | `str\|None` | `None` | large icon thumbnail on right side |
+| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
+| `color` | `str\|None` | `None` | hex color for accent / small icon tint |
+| `colorized` | `bool` | `False` | apply color as background (foreground service only) |
+| `sound` | `str\|None` | `None` | raw resource name for custom sound |
 
 Raises `NotificationError` on failure.
 
@@ -174,9 +204,44 @@ Raises `NotificationError` on failure.
 | `"exact_allow_while_idle"` | Yes | Yes | Exact time, fires even in Doze |
 | `"alarm_clock"` | Yes | Yes | Shows alarm icon in status bar |
 
+#### Notification styles
+
+Use style classes to create rich expandable notifications:
+
+```python
+from flet_android_notifications import BigTextStyle, BigPictureStyle, InboxStyle
+
+# big text — expands to show longer content
+await notifications.show_notification(
+    notification_id=1, title="Report", body="Summary ready.",
+    style=BigTextStyle("Full detailed report text here...",
+                       content_title="Report — expanded",
+                       summary_text="3 items"),
+)
+
+# big picture — shows an image when expanded
+await notifications.show_notification(
+    notification_id=2, title="Photo", body="New photo.",
+    style=BigPictureStyle(drawable_resource="ic_launcher_foreground"),
+)
+
+# inbox — shows a list of lines when expanded
+await notifications.show_notification(
+    notification_id=3, title="3 messages", body="You have mail.",
+    style=InboxStyle(["Alice: Hi", "Bob: Done", "Carol: OK"],
+                     summary_text="from 3 contacts"),
+)
+
+# progress bar
+await notifications.show_notification(
+    notification_id=4, title="Uploading", body="45%",
+    show_progress=True, max_progress=100, progress=45,
+)
+```
+
 ### `await request_exact_alarm_permission()`
 
-Request the `SCHEDULE_EXACT_ALARM` permission (required on Android 14+ for exact schedule modes). Returns `"true"` if granted, `"false"` if denied. Inexact modes do not need this permission.
+Request the `SCHEDULE_EXACT_ALARM` permission (required on Android 14+ for exact schedule modes). Returns `True` if granted, `False` if denied. Inexact modes do not need this permission.
 
 ### `await cancel(notification_id)`
 
@@ -188,7 +253,7 @@ Cancel all active notifications.
 
 ### `await request_permissions()`
 
-Request the POST_NOTIFICATIONS runtime permission (required on Android 13+). Returns `"true"` if granted, `"false"` if denied.
+Request the POST_NOTIFICATIONS runtime permission (required on Android 13+). Returns `True` if granted, `False` if denied.
 
 ## Building the APK
 
@@ -236,6 +301,33 @@ Always do a full uninstall before installing a new APK. Flet's `serious_python` 
 adb uninstall com.yourapp.package
 adb install build/apk/app-release.apk
 ```
+
+## Samsung OneUI notes
+
+Samsung OneUI overrides some standard Android notification behaviors:
+
+- **Color**: Samsung's system color palette overrides the programmatic `color` parameter. The accent color / small icon tint works on stock Android (Pixel, AOSP) but is ignored on Samsung. Users can disable this in Settings > Wallpaper and style > Color palette, or via Good Lock's QuickStar module.
+- **Brief mode**: Samsung's default compact notification view hides expanded content (large icons, styles, color). Users must swipe down on a notification to see the full expanded view.
+- **`colorized`**: only works for foreground service and media-style notifications on all Android devices, not just Samsung.
+
+These are OEM-level behaviors and cannot be overridden from app code.
+
+## Custom resources (icons, sounds)
+
+To use custom small icons or notification sounds, place the resource files in your Android `res/` directory:
+
+- **Small icons**: add a vector drawable XML to `res/drawable/` (24dp, white on transparent). Android renders small icons as single-color silhouettes.
+- **Sounds**: add audio files (WAV, MP3, OGG) to `res/raw/`. Reference by name without extension: `sound="alert_tone"` for `res/raw/alert_tone.mp3`.
+
+**Important**: resources only referenced at runtime (via `icon="..."` or `sound="..."`) may be stripped by Android's resource optimizer. Add a `res/raw/keep.xml` file to prevent this:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*,@drawable/ic_*" />
+```
+
+Sound is permanently bound to a notification channel at creation. To change the sound, use a different `channel_id` or uninstall the app to reset all channels.
 
 ## Limitations
 

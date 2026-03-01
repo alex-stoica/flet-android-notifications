@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Color;
 import 'package:flet/flet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -132,6 +133,79 @@ class NotificationsService extends FletService {
     }
   }
 
+  GroupAlertBehavior _parseGroupAlertBehavior(String value) {
+    switch (value) {
+      case "summary":
+        return GroupAlertBehavior.summary;
+      case "children":
+        return GroupAlertBehavior.children;
+      default:
+        return GroupAlertBehavior.all;
+    }
+  }
+
+  Color? _parseColor(String? hex) {
+    if (hex == null) return null;
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.parse(hex, radix: 16));
+  }
+
+  AndroidBitmap<Object>? _parseLargeIcon(String? value, String type) {
+    if (value == null) return null;
+    if (type == "file_path") {
+      return FilePathAndroidBitmap(value);
+    }
+    return DrawableResourceAndroidBitmap(value);
+  }
+
+  StyleInformation? _parseStyleInformation(Map<String, dynamic>? style) {
+    if (style == null) return null;
+    switch (style["type"]) {
+      case "big_text":
+        return BigTextStyleInformation(
+          style["big_text"] as String,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+        );
+      case "big_picture":
+        final bitmapType = style["bitmap_type"] as String;
+        final bitmapValue = style["bitmap_value"] as String;
+        AndroidBitmap<Object> bitmap;
+        if (bitmapType == "file_path") {
+          bitmap = FilePathAndroidBitmap(bitmapValue);
+        } else {
+          bitmap = DrawableResourceAndroidBitmap(bitmapValue);
+        }
+        AndroidBitmap<Object>? largeIcon;
+        if (style["large_icon_type"] != null) {
+          final iconType = style["large_icon_type"] as String;
+          final iconValue = style["large_icon_value"] as String;
+          if (iconType == "file_path") {
+            largeIcon = FilePathAndroidBitmap(iconValue);
+          } else {
+            largeIcon = DrawableResourceAndroidBitmap(iconValue);
+          }
+        }
+        return BigPictureStyleInformation(
+          bitmap,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+          largeIcon: largeIcon,
+          hideExpandedLargeIcon: style["hide_expanded_large_icon"] as bool? ?? false,
+        );
+      case "inbox":
+        final lines = (style["lines"] as List<dynamic>).cast<String>();
+        return InboxStyleInformation(
+          lines,
+          contentTitle: style["content_title"] as String?,
+          summaryText: style["summary_text"] as String?,
+        );
+      default:
+        return null;
+    }
+  }
+
   NotificationDetails _buildNotificationDetails({
     required String channelId,
     required String channelName,
@@ -141,6 +215,19 @@ class NotificationsService extends FletService {
     required bool playSound,
     required bool enableVibration,
     required List<AndroidNotificationAction> actions,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -151,6 +238,19 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound != null ? RawResourceAndroidNotificationSound(sound) : null,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -172,6 +272,9 @@ class NotificationsService extends FletService {
         case "show_notification":
           final a = Map<String, dynamic>.from(args as Map);
           final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
           await _showNotification(
             a["id"] as int,
             a["title"] as String,
@@ -185,11 +288,30 @@ class NotificationsService extends FletService {
             playSound: a["play_sound"] as bool,
             enableVibration: a["enable_vibration"] as bool,
             actions: _parseActions(a["actions"] as List<dynamic>),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
           );
           return "ok";
         case "schedule_notification":
           final a = Map<String, dynamic>.from(args as Map);
           final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
           await _scheduleNotification(
             a["id"] as int,
             a["title"] as String,
@@ -208,6 +330,22 @@ class NotificationsService extends FletService {
                 a["schedule_mode"] as String),
             matchDateTimeComponents: _parseDateTimeComponents(
                 a["match_date_time_components"] as String?),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
           );
           return "ok";
         case "cancel":
@@ -243,8 +381,24 @@ class NotificationsService extends FletService {
     required bool playSound,
     required bool enableVibration,
     required List<AndroidNotificationAction> actions,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) async {
-    await _ensureInitialized();
+    final initialized = await _ensureInitialized();
+    if (!initialized) {
+      throw Exception('Notification plugin failed to initialize');
+    }
     _lastShowTime = DateTime.now();
 
     final details = _buildNotificationDetails(
@@ -256,6 +410,19 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound,
     );
 
     await _plugin.show(id, title, body, details, payload: payload);
@@ -277,8 +444,24 @@ class NotificationsService extends FletService {
     required List<AndroidNotificationAction> actions,
     required AndroidScheduleMode scheduleMode,
     required DateTimeComponents? matchDateTimeComponents,
+    StyleInformation? styleInformation,
+    bool showProgress = false,
+    int maxProgress = 0,
+    int progress = 0,
+    bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) async {
-    await _ensureInitialized();
+    final initialized = await _ensureInitialized();
+    if (!initialized) {
+      throw Exception('Notification plugin failed to initialize');
+    }
 
     final scheduledDate = tz.TZDateTime.from(
       DateTime.fromMillisecondsSinceEpoch(scheduledEpochMs, isUtc: true),
@@ -294,6 +477,19 @@ class NotificationsService extends FletService {
       playSound: playSound,
       enableVibration: enableVibration,
       actions: actions,
+      styleInformation: styleInformation,
+      showProgress: showProgress,
+      maxProgress: maxProgress,
+      progress: progress,
+      indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound,
     );
 
     await _plugin.zonedSchedule(

@@ -1,6 +1,6 @@
 # Examples
 
-Three standalone examples, each demonstrating a different feature. To test any of them, copy it to your project as `main.py` and build with `flet build apk -v`.
+Five standalone examples, each demonstrating a different feature. To test any of them, copy it to your project as `main.py` and build with `flet build apk -v`.
 
 ## simple.py — Basic notification
 
@@ -63,6 +63,51 @@ Scheduled for 14:32:15
 
 -> wait 30 seconds
 -> notification appears: title="Reminder", body="Scheduled for 14:32:15"
+```
+
+## big_text.py — Big text notification
+
+Shows a notification that expands to reveal a longer message when pulled down.
+
+**What it does**: Tapping "Send big text notification" shows a notification with a short body. Pulling down on the notification reveals the full expanded text.
+
+**What to test**:
+- Tap the button — notification appears with "Your weekly summary is ready."
+- Pull down on the notification — expanded text shows the full summary with a different title and summary line
+
+**Expected output**:
+```
+[Button: "Send big text notification"]
+
+-> tap button
+-> notification appears: title="Weekly report", body="Your weekly summary is ready."
+-> pull down on notification
+-> expanded: title="Weekly report — expanded", full summary text, summary="12 tasks completed"
+```
+
+## notification_styles.py — All notification styles
+
+Four buttons showcasing big text, big picture, inbox, and progress bar styles.
+
+**What it does**: Each button sends a notification with a different style. Big text expands to show long text, big picture shows an image, inbox shows multiple message lines, and progress bar shows a determinate progress indicator.
+
+**What to test**:
+- Tap "Big text" — notification expands to show wrapped multi-line text
+- Tap "Big picture" — notification expands to show the app icon as a large image
+- Tap "Inbox" — notification expands to show 3 message lines
+- Tap "Progress bar" — notification shows a progress bar at 45%
+
+**Expected output**:
+```
+[Button: "Big text"]
+[Button: "Big picture"]
+[Button: "Inbox"]
+[Button: "Progress bar"]
+
+-> tap "Big text" -> expandable long text notification
+-> tap "Big picture" -> notification with app icon image
+-> tap "Inbox" -> notification with 3 message lines
+-> tap "Progress bar" -> notification with 45% progress bar
 ```
 
 ## Building and deploying
