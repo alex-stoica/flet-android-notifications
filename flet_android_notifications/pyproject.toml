@@ -1,9 +1,9 @@
 [project]
 name = "flet-android-notifications"
-version = "0.4.0"
+version = "0.5.2"
 description = "Native local notifications for Flet apps (Android)"
 requires-python = ">=3.10"
-readme = {text = "See [README on GitHub](https://github.com/alex-stoica/flet-android-notifications) for full documentation.", content-type = "text/markdown"}
+readme = "../README.md"
 license = "MIT"
 authors = [
     {name = "Alex Stoica", email = "alexstoica@protonmail.com"},
@@ -27,9 +27,9 @@ Homepage = "https://github.com/alex-stoica/flet-android-notifications"
 Repository = "https://github.com/alex-stoica/flet-android-notifications"
 Issues = "https://github.com/alex-stoica/flet-android-notifications/issues"
 
-[tool.setuptools.package-data]
-"flutter.flet_android_notifications" = ["**/*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/flet_android_notifications", "src/flutter"]
 
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -113,7 +113,7 @@ ft.run(main)
 
 Just instantiate `FletAndroidNotifications`. Do not add it to `page.overlay` or `page.controls` -- it's a service, not a visual control, and it registers itself automatically.
 
-See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py), [`big_text.py`](examples/big_text.py), [`notification_styles.py`](examples/notification_styles.py).
+See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py), [`big_text.py`](examples/big_text.py), [`notification_styles.py`](examples/notification_styles.py), [`advanced_options.py`](examples/advanced_options.py).
 
 ## API
 
@@ -156,6 +156,14 @@ The service. Instantiate once. The `on_notification_tap` callback receives an ev
 | `color` | `str\|None` | `None` | hex color (e.g. `"#FF5722"`) for accent color / small icon tint. See [Samsung color note](#samsung-oneui-notes). |
 | `colorized` | `bool` | `False` | apply color as background (foreground service / media-style only) |
 | `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"` for `res/raw/alert_tone.mp3`). Sound is permanently bound to the channel — changing it requires a different `channel_id`. |
+| `ongoing` | `bool` | `False` | persistent notification that can't be swiped away |
+| `auto_cancel` | `bool` | `True` | dismiss notification when tapped |
+| `silent` | `bool` | `False` | suppress sound and vibration |
+| `only_alert_once` | `bool` | `False` | only alert (sound/vibration) on first show; updates are silent |
+| `visibility` | `str\|None` | `None` | lock screen visibility: `"public"`, `"private"`, or `"secret"` |
+| `sub_text` | `str\|None` | `None` | small text shown below the notification content |
+| `channel_bypass_dnd` | `bool` | `False` | allow channel to bypass do-not-disturb (only takes effect when channel is first created) |
+| `vibration_pattern` | `list[int]\|None` | `None` | custom vibration pattern in ms, e.g. `[0, 500, 200, 500]` |
 
 Raises `NotificationError` on failure.
 
@@ -191,6 +199,14 @@ Raises `NotificationError` on failure.
 | `color` | `str\|None` | `None` | hex color for accent / small icon tint |
 | `colorized` | `bool` | `False` | apply color as background (foreground service only) |
 | `sound` | `str\|None` | `None` | raw resource name for custom sound |
+| `ongoing` | `bool` | `False` | persistent notification that can't be swiped away |
+| `auto_cancel` | `bool` | `True` | dismiss notification when tapped |
+| `silent` | `bool` | `False` | suppress sound and vibration |
+| `only_alert_once` | `bool` | `False` | only alert on first show; updates are silent |
+| `visibility` | `str\|None` | `None` | lock screen visibility: `"public"`, `"private"`, or `"secret"` |
+| `sub_text` | `str\|None` | `None` | small text shown below the notification content |
+| `channel_bypass_dnd` | `bool` | `False` | allow channel to bypass do-not-disturb |
+| `vibration_pattern` | `list[int]\|None` | `None` | custom vibration pattern in ms, e.g. `[0, 500, 200, 500]` |
 
 Raises `NotificationError` on failure.
 
@@ -236,6 +252,27 @@ await notifications.show_notification(
 await notifications.show_notification(
     notification_id=4, title="Uploading", body="45%",
     show_progress=True, max_progress=100, progress=45,
+)
+```
+
+#### Advanced options
+
+Use `ongoing` and `silent` together for a persistent download tracker that doesn't interrupt the user:
+
+```python
+await notifications.show_notification(
+    notification_id=10, title="Downloading", body="45%",
+    ongoing=True, silent=True,
+    show_progress=True, max_progress=100, progress=45,
+)
+```
+
+Use `visibility` to hide sensitive content on the lock screen:
+
+```python
+await notifications.show_notification(
+    notification_id=11, title="New message", body="Contents hidden.",
+    visibility="secret",
 )
 ```
 

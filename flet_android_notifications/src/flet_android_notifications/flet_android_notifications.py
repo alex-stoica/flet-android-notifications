@@ -112,6 +112,17 @@ class InboxStyle:
 NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
 
 
+_VALID_VISIBILITIES = {"public", "private", "secret"}
+
+
+def _validate_visibility(visibility: str) -> None:
+    """Validate visibility is one of public, private, secret."""
+    if visibility not in _VALID_VISIBILITIES:
+        raise ValueError(
+            f"visibility must be one of {sorted(_VALID_VISIBILITIES)}, got: {visibility!r}"
+        )
+
+
 def _validate_color_hex(color: str) -> None:
     """Validate a hex color string like '#FF5722' or '#80FF5722'."""
     if not color.startswith("#"):
@@ -163,6 +174,14 @@ class FletAndroidNotifications(ft.Service):
         color: Optional[str] = None,
         colorized: bool = False,
         sound: Optional[str] = None,
+        ongoing: bool = False,
+        auto_cancel: bool = True,
+        silent: bool = False,
+        only_alert_once: bool = False,
+        visibility: Optional[str] = None,
+        sub_text: Optional[str] = None,
+        channel_bypass_dnd: bool = False,
+        vibration_pattern: Optional[list[int]] = None,
     ):
         """Show an Android notification.
 
@@ -206,12 +225,28 @@ class FletAndroidNotifications(ft.Service):
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
                 it later requires a different channel_id.
+            ongoing: Persistent notification that can't be swiped away.
+            auto_cancel: Dismiss notification when tapped. Default True.
+            silent: Suppress sound and vibration.
+            only_alert_once: Only alert (sound/vibration) on the first
+                show; updates are silent.
+            visibility: Lock screen visibility. One of "public" (show
+                full content), "private" (hide sensitive content), or
+                "secret" (don't show on lock screen at all).
+            sub_text: Small text shown below the notification content.
+            channel_bypass_dnd: Allow the notification channel to bypass
+                do-not-disturb mode. Only takes effect when the channel
+                is first created.
+            vibration_pattern: Custom vibration pattern as a list of
+                millisecond durations, e.g. [0, 500, 200, 500].
 
         Raises:
             NotificationError: If the native side reports an error.
         """
         if color is not None:
             _validate_color_hex(color)
+        if visibility is not None:
+            _validate_visibility(visibility)
         result = await self._invoke_method(
             method_name="show_notification",
             arguments={
@@ -240,6 +275,14 @@ class FletAndroidNotifications(ft.Service):
                 "color": color,
                 "colorized": colorized,
                 "sound": sound,
+                "ongoing": ongoing,
+                "auto_cancel": auto_cancel,
+                "silent": silent,
+                "only_alert_once": only_alert_once,
+                "visibility": visibility,
+                "sub_text": sub_text,
+                "channel_bypass_dnd": channel_bypass_dnd,
+                "vibration_pattern": vibration_pattern,
             },
         )
         return self._check_error(result)
@@ -275,6 +318,14 @@ class FletAndroidNotifications(ft.Service):
         color: Optional[str] = None,
         colorized: bool = False,
         sound: Optional[str] = None,
+        ongoing: bool = False,
+        auto_cancel: bool = True,
+        silent: bool = False,
+        only_alert_once: bool = False,
+        visibility: Optional[str] = None,
+        sub_text: Optional[str] = None,
+        channel_bypass_dnd: bool = False,
+        vibration_pattern: Optional[list[int]] = None,
     ):
         """Schedule an Android notification for a future time.
 
@@ -328,12 +379,28 @@ class FletAndroidNotifications(ft.Service):
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
                 it later requires a different channel_id.
+            ongoing: Persistent notification that can't be swiped away.
+            auto_cancel: Dismiss notification when tapped. Default True.
+            silent: Suppress sound and vibration.
+            only_alert_once: Only alert (sound/vibration) on the first
+                show; updates are silent.
+            visibility: Lock screen visibility. One of "public" (show
+                full content), "private" (hide sensitive content), or
+                "secret" (don't show on lock screen at all).
+            sub_text: Small text shown below the notification content.
+            channel_bypass_dnd: Allow the notification channel to bypass
+                do-not-disturb mode. Only takes effect when the channel
+                is first created.
+            vibration_pattern: Custom vibration pattern as a list of
+                millisecond durations, e.g. [0, 500, 200, 500].
 
         Raises:
             NotificationError: If the native side reports an error.
         """
         if color is not None:
             _validate_color_hex(color)
+        if visibility is not None:
+            _validate_visibility(visibility)
         epoch_ms = int(scheduled_time.timestamp() * 1000)
         result = await self._invoke_method(
             method_name="schedule_notification",
@@ -366,6 +433,14 @@ class FletAndroidNotifications(ft.Service):
                 "color": color,
                 "colorized": colorized,
                 "sound": sound,
+                "ongoing": ongoing,
+                "auto_cancel": auto_cancel,
+                "silent": silent,
+                "only_alert_once": only_alert_once,
+                "visibility": visibility,
+                "sub_text": sub_text,
+                "channel_bypass_dnd": channel_bypass_dnd,
+                "vibration_pattern": vibration_pattern,
             },
         )
         return self._check_error(result)
