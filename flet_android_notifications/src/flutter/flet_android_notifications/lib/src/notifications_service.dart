@@ -40,7 +40,7 @@ class NotificationsService extends FletService {
       const initSettings = InitializationSettings(android: androidSettings);
 
       final result = await _plugin.initialize(
-        initSettings,
+        initializationSettings: initSettings,
         onDidReceiveNotificationResponse: (response) {
           final hasAction = response.actionId != null && response.actionId!.isNotEmpty;
           // Debounce only body taps — Samsung OneUI fires phantom body taps
@@ -403,7 +403,7 @@ class NotificationsService extends FletService {
           return "ok";
         case "cancel":
           final a = Map<String, dynamic>.from(args as Map);
-          await _plugin.cancel(a["id"] as int);
+          await _plugin.cancel(id: a["id"] as int);
           return "ok";
         case "cancel_all":
           await _plugin.cancelAll();
@@ -494,7 +494,7 @@ class NotificationsService extends FletService {
       vibrationPattern: vibrationPattern,
     );
 
-    await _plugin.show(id, title, body, details, payload: payload);
+    await _plugin.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
   }
 
   Future<void> _scheduleNotification(
@@ -578,11 +578,11 @@ class NotificationsService extends FletService {
     );
 
     await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledDate,
-      details,
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+      notificationDetails: details,
       androidScheduleMode: scheduleMode,
       payload: payload,
       matchDateTimeComponents: matchDateTimeComponents,
