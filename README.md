@@ -147,6 +147,15 @@ The service. Instantiate once. The `on_notification_tap` callback receives an ev
 | `max_progress` | `int` | `0` | maximum progress value |
 | `progress` | `int` | `0` | current progress value |
 | `indeterminate` | `bool` | `False` | indeterminate progress bar |
+| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
+| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
+| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
+| `icon` | `str\|None` | `None` | drawable resource name for small icon (e.g. `"ic_notification"`). None = app launcher icon. Android renders small icons as single-color silhouettes. |
+| `large_icon` | `str\|None` | `None` | large icon shown as thumbnail on right side |
+| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
+| `color` | `str\|None` | `None` | hex color (e.g. `"#FF5722"`) for accent color / small icon tint. See [Samsung color note](#samsung-oneui-notes). |
+| `colorized` | `bool` | `False` | apply color as background (foreground service / media-style only) |
+| `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"` for `res/raw/alert_tone.mp3`). Sound is permanently bound to the channel — changing it requires a different `channel_id`. |
 
 Raises `NotificationError` on failure.
 
@@ -173,6 +182,15 @@ Raises `NotificationError` on failure.
 | `max_progress` | `int` | `0` | maximum progress value |
 | `progress` | `int` | `0` | current progress value |
 | `indeterminate` | `bool` | `False` | indeterminate progress bar |
+| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
+| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
+| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
+| `icon` | `str\|None` | `None` | drawable resource name for small icon |
+| `large_icon` | `str\|None` | `None` | large icon thumbnail on right side |
+| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
+| `color` | `str\|None` | `None` | hex color for accent / small icon tint |
+| `colorized` | `bool` | `False` | apply color as background (foreground service only) |
+| `sound` | `str\|None` | `None` | raw resource name for custom sound |
 
 Raises `NotificationError` on failure.
 
@@ -283,6 +301,33 @@ Always do a full uninstall before installing a new APK. Flet's `serious_python` 
 adb uninstall com.yourapp.package
 adb install build/apk/app-release.apk
 ```
+
+## Samsung OneUI notes
+
+Samsung OneUI overrides some standard Android notification behaviors:
+
+- **Color**: Samsung's system color palette overrides the programmatic `color` parameter. The accent color / small icon tint works on stock Android (Pixel, AOSP) but is ignored on Samsung. Users can disable this in Settings > Wallpaper and style > Color palette, or via Good Lock's QuickStar module.
+- **Brief mode**: Samsung's default compact notification view hides expanded content (large icons, styles, color). Users must swipe down on a notification to see the full expanded view.
+- **`colorized`**: only works for foreground service and media-style notifications on all Android devices, not just Samsung.
+
+These are OEM-level behaviors and cannot be overridden from app code.
+
+## Custom resources (icons, sounds)
+
+To use custom small icons or notification sounds, place the resource files in your Android `res/` directory:
+
+- **Small icons**: add a vector drawable XML to `res/drawable/` (24dp, white on transparent). Android renders small icons as single-color silhouettes.
+- **Sounds**: add audio files (WAV, MP3, OGG) to `res/raw/`. Reference by name without extension: `sound="alert_tone"` for `res/raw/alert_tone.mp3`.
+
+**Important**: resources only referenced at runtime (via `icon="..."` or `sound="..."`) may be stripped by Android's resource optimizer. Add a `res/raw/keep.xml` file to prevent this:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*,@drawable/ic_*" />
+```
+
+Sound is permanently bound to a notification channel at creation. To change the sound, use a different `channel_id` or uninstall the app to reset all channels.
 
 ## Limitations
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Color;
 import 'package:flet/flet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -132,6 +133,32 @@ class NotificationsService extends FletService {
     }
   }
 
+  GroupAlertBehavior _parseGroupAlertBehavior(String value) {
+    switch (value) {
+      case "summary":
+        return GroupAlertBehavior.summary;
+      case "children":
+        return GroupAlertBehavior.children;
+      default:
+        return GroupAlertBehavior.all;
+    }
+  }
+
+  Color? _parseColor(String? hex) {
+    if (hex == null) return null;
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.parse(hex, radix: 16));
+  }
+
+  AndroidBitmap<Object>? _parseLargeIcon(String? value, String type) {
+    if (value == null) return null;
+    if (type == "file_path") {
+      return FilePathAndroidBitmap(value);
+    }
+    return DrawableResourceAndroidBitmap(value);
+  }
+
   StyleInformation? _parseStyleInformation(Map<String, dynamic>? style) {
     if (style == null) return null;
     switch (style["type"]) {
@@ -193,6 +220,14 @@ class NotificationsService extends FletService {
     int maxProgress = 0,
     int progress = 0,
     bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -208,6 +243,14 @@ class NotificationsService extends FletService {
       maxProgress: maxProgress,
       progress: progress,
       indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound != null ? RawResourceAndroidNotificationSound(sound) : null,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -250,6 +293,17 @@ class NotificationsService extends FletService {
             maxProgress: a["max_progress"] as int? ?? 0,
             progress: a["progress"] as int? ?? 0,
             indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
           );
           return "ok";
         case "schedule_notification":
@@ -281,6 +335,17 @@ class NotificationsService extends FletService {
             maxProgress: a["max_progress"] as int? ?? 0,
             progress: a["progress"] as int? ?? 0,
             indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
           );
           return "ok";
         case "cancel":
@@ -321,6 +386,14 @@ class NotificationsService extends FletService {
     int maxProgress = 0,
     int progress = 0,
     bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -342,6 +415,14 @@ class NotificationsService extends FletService {
       maxProgress: maxProgress,
       progress: progress,
       indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound,
     );
 
     await _plugin.show(id, title, body, details, payload: payload);
@@ -368,6 +449,14 @@ class NotificationsService extends FletService {
     int maxProgress = 0,
     int progress = 0,
     bool indeterminate = false,
+    String? groupKey,
+    bool setAsGroupSummary = false,
+    GroupAlertBehavior groupAlertBehavior = GroupAlertBehavior.all,
+    String? icon,
+    AndroidBitmap<Object>? largeIcon,
+    Color? color,
+    bool colorized = false,
+    String? sound,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -393,6 +482,14 @@ class NotificationsService extends FletService {
       maxProgress: maxProgress,
       progress: progress,
       indeterminate: indeterminate,
+      groupKey: groupKey,
+      setAsGroupSummary: setAsGroupSummary,
+      groupAlertBehavior: groupAlertBehavior,
+      icon: icon,
+      largeIcon: largeIcon,
+      color: color,
+      colorized: colorized,
+      sound: sound,
     );
 
     await _plugin.zonedSchedule(
