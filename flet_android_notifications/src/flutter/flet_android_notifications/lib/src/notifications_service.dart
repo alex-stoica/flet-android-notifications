@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data' show Int64List;
 import 'dart:ui' show Color;
 import 'package:flet/flet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -159,6 +160,20 @@ class NotificationsService extends FletService {
     return DrawableResourceAndroidBitmap(value);
   }
 
+  NotificationVisibility? _parseVisibility(String? value) {
+    if (value == null) return null;
+    switch (value) {
+      case "public":
+        return NotificationVisibility.public;
+      case "private":
+        return NotificationVisibility.private;
+      case "secret":
+        return NotificationVisibility.secret;
+      default:
+        return null;
+    }
+  }
+
   StyleInformation? _parseStyleInformation(Map<String, dynamic>? style) {
     if (style == null) return null;
     switch (style["type"]) {
@@ -228,6 +243,14 @@ class NotificationsService extends FletService {
     Color? color,
     bool colorized = false,
     String? sound,
+    bool ongoing = false,
+    bool autoCancel = true,
+    bool silent = false,
+    bool onlyAlertOnce = false,
+    NotificationVisibility? visibility,
+    String? subText,
+    bool channelBypassDnd = false,
+    Int64List? vibrationPattern,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -251,6 +274,14 @@ class NotificationsService extends FletService {
       color: color,
       colorized: colorized,
       sound: sound != null ? RawResourceAndroidNotificationSound(sound) : null,
+      ongoing: ongoing,
+      autoCancel: autoCancel,
+      silent: silent,
+      onlyAlertOnce: onlyAlertOnce,
+      visibility: visibility,
+      subText: subText,
+      channelBypassDnd: channelBypassDnd,
+      vibrationPattern: vibrationPattern,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -304,6 +335,17 @@ class NotificationsService extends FletService {
             color: _parseColor(a["color"] as String?),
             colorized: a["colorized"] as bool? ?? false,
             sound: a["sound"] as String?,
+            ongoing: a["ongoing"] as bool? ?? false,
+            autoCancel: a["auto_cancel"] as bool? ?? true,
+            silent: a["silent"] as bool? ?? false,
+            onlyAlertOnce: a["only_alert_once"] as bool? ?? false,
+            visibility: _parseVisibility(a["visibility"] as String?),
+            subText: a["sub_text"] as String?,
+            channelBypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            vibrationPattern: a["vibration_pattern"] != null
+                ? Int64List.fromList(
+                    (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                : null,
           );
           return "ok";
         case "schedule_notification":
@@ -346,6 +388,17 @@ class NotificationsService extends FletService {
             color: _parseColor(a["color"] as String?),
             colorized: a["colorized"] as bool? ?? false,
             sound: a["sound"] as String?,
+            ongoing: a["ongoing"] as bool? ?? false,
+            autoCancel: a["auto_cancel"] as bool? ?? true,
+            silent: a["silent"] as bool? ?? false,
+            onlyAlertOnce: a["only_alert_once"] as bool? ?? false,
+            visibility: _parseVisibility(a["visibility"] as String?),
+            subText: a["sub_text"] as String?,
+            channelBypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            vibrationPattern: a["vibration_pattern"] != null
+                ? Int64List.fromList(
+                    (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                : null,
           );
           return "ok";
         case "cancel":
@@ -394,6 +447,14 @@ class NotificationsService extends FletService {
     Color? color,
     bool colorized = false,
     String? sound,
+    bool ongoing = false,
+    bool autoCancel = true,
+    bool silent = false,
+    bool onlyAlertOnce = false,
+    NotificationVisibility? visibility,
+    String? subText,
+    bool channelBypassDnd = false,
+    Int64List? vibrationPattern,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -423,6 +484,14 @@ class NotificationsService extends FletService {
       color: color,
       colorized: colorized,
       sound: sound,
+      ongoing: ongoing,
+      autoCancel: autoCancel,
+      silent: silent,
+      onlyAlertOnce: onlyAlertOnce,
+      visibility: visibility,
+      subText: subText,
+      channelBypassDnd: channelBypassDnd,
+      vibrationPattern: vibrationPattern,
     );
 
     await _plugin.show(id, title, body, details, payload: payload);
@@ -457,6 +526,14 @@ class NotificationsService extends FletService {
     Color? color,
     bool colorized = false,
     String? sound,
+    bool ongoing = false,
+    bool autoCancel = true,
+    bool silent = false,
+    bool onlyAlertOnce = false,
+    NotificationVisibility? visibility,
+    String? subText,
+    bool channelBypassDnd = false,
+    Int64List? vibrationPattern,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -490,6 +567,14 @@ class NotificationsService extends FletService {
       color: color,
       colorized: colorized,
       sound: sound,
+      ongoing: ongoing,
+      autoCancel: autoCancel,
+      silent: silent,
+      onlyAlertOnce: onlyAlertOnce,
+      visibility: visibility,
+      subText: subText,
+      channelBypassDnd: channelBypassDnd,
+      vibrationPattern: vibrationPattern,
     );
 
     await _plugin.zonedSchedule(

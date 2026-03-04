@@ -1,6 +1,6 @@
 # Examples
 
-Five standalone examples, each demonstrating a different feature. To test any of them, copy it to your project as `main.py` and build with `flet build apk -v`.
+Six standalone examples, each demonstrating a different feature. To test any of them, copy it to your project as `main.py` and build with `flet build apk -v`.
 
 ## simple.py — Basic notification
 
@@ -108,6 +108,43 @@ Four buttons showcasing big text, big picture, inbox, and progress bar styles.
 -> tap "Big picture" -> notification with app icon image
 -> tap "Inbox" -> notification with 3 message lines
 -> tap "Progress bar" -> notification with 45% progress bar
+```
+
+## advanced_options.py — Advanced notification options
+
+Eight buttons, each demonstrating one advanced parameter in isolation.
+
+**What it does**: Each button sends a notification with a specific option (ongoing, silent, only-alert-once, visibility, sub text, DnD bypass, custom vibration, or ongoing + no auto-cancel).
+
+**What to test**:
+- Tap "Ongoing" — notification stays when you try to swipe it away
+- Tap "Silent" — notification appears without sound or vibration
+- Tap "Only alert once" twice — the second tap updates silently
+- Tap "Lock screen: secret" — notification is hidden on the lock screen
+- Tap "Sub text" — "via Email" appears below the notification content
+- Tap "Bypass DnD" — enable do-not-disturb first, notification should still appear
+- Tap "Custom vibration" — feel a distinct wait-buzz-pause-buzz pattern
+- Tap "Ongoing + no cancel" — can't swipe away and tapping doesn't dismiss
+
+**Expected output**:
+```
+[Button: "Ongoing"]
+[Button: "Silent"]
+[Button: "Only alert once"]
+[Button: "Lock screen: secret"]
+[Button: "Sub text"]
+[Button: "Bypass DnD"]
+[Button: "Custom vibration"]
+[Button: "Ongoing + no cancel"]
+
+-> tap "Ongoing" -> persistent notification, can't swipe away
+-> tap "Silent" -> notification appears silently
+-> tap "Only alert once" x2 -> second update is silent
+-> tap "Lock screen: secret" -> hidden on lock screen
+-> tap "Sub text" -> "via Email" shown below content
+-> tap "Bypass DnD" -> appears even in DnD mode
+-> tap "Custom vibration" -> custom vibration pattern
+-> tap "Ongoing + no cancel" -> sticky, tap doesn't dismiss
 ```
 
 ## Building and deploying
