@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import flet as ft
 from typing import Optional, Union
 
@@ -182,6 +183,7 @@ class FletAndroidNotifications(ft.Service):
         sub_text: Optional[str] = None,
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
+        timeout_after: Optional[int] = None,
     ):
         """Show an Android notification.
 
@@ -239,6 +241,8 @@ class FletAndroidNotifications(ft.Service):
                 is first created.
             vibration_pattern: Custom vibration pattern as a list of
                 millisecond durations, e.g. [0, 500, 200, 500].
+            timeout_after: Auto-dismiss the notification after this many
+                milliseconds. None means no timeout.
 
         Raises:
             NotificationError: If the native side reports an error.
@@ -283,6 +287,7 @@ class FletAndroidNotifications(ft.Service):
                 "sub_text": sub_text,
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
+                "timeout_after": timeout_after,
             },
         )
         return self._check_error(result)
@@ -326,6 +331,7 @@ class FletAndroidNotifications(ft.Service):
         sub_text: Optional[str] = None,
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
+        timeout_after: Optional[int] = None,
     ):
         """Schedule an Android notification for a future time.
 
@@ -393,6 +399,8 @@ class FletAndroidNotifications(ft.Service):
                 is first created.
             vibration_pattern: Custom vibration pattern as a list of
                 millisecond durations, e.g. [0, 500, 200, 500].
+            timeout_after: Auto-dismiss the notification after this many
+                milliseconds. None means no timeout.
 
         Raises:
             NotificationError: If the native side reports an error.
@@ -441,9 +449,238 @@ class FletAndroidNotifications(ft.Service):
                 "sub_text": sub_text,
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
+                "timeout_after": timeout_after,
             },
         )
         return self._check_error(result)
+
+    async def periodically_show(
+        self,
+        notification_id: int,
+        title: str,
+        body: str,
+        repeat_interval: str,
+        *,
+        payload: str = "",
+        actions: Optional[list[dict]] = None,
+        channel_id: str = "flet_notifications",
+        channel_name: str = "Flet Notifications",
+        channel_description: str = "Notifications from Flet app",
+        importance: str = "high",
+        play_sound: bool = True,
+        enable_vibration: bool = True,
+        style: Optional[NotificationStyle] = None,
+        show_progress: bool = False,
+        max_progress: int = 0,
+        progress: int = 0,
+        indeterminate: bool = False,
+        group_key: Optional[str] = None,
+        set_as_group_summary: bool = False,
+        group_alert_behavior: str = "all",
+        icon: Optional[str] = None,
+        large_icon: Optional[str] = None,
+        large_icon_type: str = "drawable_resource",
+        color: Optional[str] = None,
+        colorized: bool = False,
+        sound: Optional[str] = None,
+        ongoing: bool = False,
+        auto_cancel: bool = True,
+        silent: bool = False,
+        only_alert_once: bool = False,
+        visibility: Optional[str] = None,
+        sub_text: Optional[str] = None,
+        channel_bypass_dnd: bool = False,
+        vibration_pattern: Optional[list[int]] = None,
+        timeout_after: Optional[int] = None,
+    ):
+        """Show a notification that repeats at a fixed interval.
+
+        Args:
+            notification_id: Unique integer ID for this notification.
+            title: Notification title.
+            body: Notification body text.
+            repeat_interval: One of "every_minute", "hourly", "daily", "weekly".
+            payload: Arbitrary string returned in on_notification_tap event.
+            timeout_after: Auto-dismiss after this many milliseconds.
+            (All other params are the same as show_notification.)
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        if color is not None:
+            _validate_color_hex(color)
+        if visibility is not None:
+            _validate_visibility(visibility)
+        result = await self._invoke_method(
+            method_name="periodically_show",
+            arguments={
+                "id": notification_id,
+                "title": title,
+                "body": body,
+                "repeat_interval": repeat_interval,
+                "payload": payload,
+                "actions": actions or [],
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "channel_description": channel_description,
+                "importance": importance,
+                "play_sound": play_sound,
+                "enable_vibration": enable_vibration,
+                "style": style.to_dict() if style else None,
+                "show_progress": show_progress,
+                "max_progress": max_progress,
+                "progress": progress,
+                "indeterminate": indeterminate,
+                "group_key": group_key,
+                "set_as_group_summary": set_as_group_summary,
+                "group_alert_behavior": group_alert_behavior,
+                "icon": icon,
+                "large_icon": large_icon,
+                "large_icon_type": large_icon_type,
+                "color": color,
+                "colorized": colorized,
+                "sound": sound,
+                "ongoing": ongoing,
+                "auto_cancel": auto_cancel,
+                "silent": silent,
+                "only_alert_once": only_alert_once,
+                "visibility": visibility,
+                "sub_text": sub_text,
+                "channel_bypass_dnd": channel_bypass_dnd,
+                "vibration_pattern": vibration_pattern,
+                "timeout_after": timeout_after,
+            },
+        )
+        return self._check_error(result)
+
+    async def periodically_show_with_duration(
+        self,
+        notification_id: int,
+        title: str,
+        body: str,
+        duration_seconds: Union[int, float],
+        *,
+        payload: str = "",
+        actions: Optional[list[dict]] = None,
+        channel_id: str = "flet_notifications",
+        channel_name: str = "Flet Notifications",
+        channel_description: str = "Notifications from Flet app",
+        importance: str = "high",
+        play_sound: bool = True,
+        enable_vibration: bool = True,
+        style: Optional[NotificationStyle] = None,
+        show_progress: bool = False,
+        max_progress: int = 0,
+        progress: int = 0,
+        indeterminate: bool = False,
+        group_key: Optional[str] = None,
+        set_as_group_summary: bool = False,
+        group_alert_behavior: str = "all",
+        icon: Optional[str] = None,
+        large_icon: Optional[str] = None,
+        large_icon_type: str = "drawable_resource",
+        color: Optional[str] = None,
+        colorized: bool = False,
+        sound: Optional[str] = None,
+        ongoing: bool = False,
+        auto_cancel: bool = True,
+        silent: bool = False,
+        only_alert_once: bool = False,
+        visibility: Optional[str] = None,
+        sub_text: Optional[str] = None,
+        channel_bypass_dnd: bool = False,
+        vibration_pattern: Optional[list[int]] = None,
+        timeout_after: Optional[int] = None,
+    ):
+        """Show a notification that repeats at a custom duration.
+
+        Args:
+            notification_id: Unique integer ID for this notification.
+            title: Notification title.
+            body: Notification body text.
+            duration_seconds: Repeat interval in seconds.
+            payload: Arbitrary string returned in on_notification_tap event.
+            timeout_after: Auto-dismiss after this many milliseconds.
+            (All other params are the same as show_notification.)
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        if color is not None:
+            _validate_color_hex(color)
+        if visibility is not None:
+            _validate_visibility(visibility)
+        result = await self._invoke_method(
+            method_name="periodically_show_with_duration",
+            arguments={
+                "id": notification_id,
+                "title": title,
+                "body": body,
+                "duration_ms": int(duration_seconds * 1000),
+                "payload": payload,
+                "actions": actions or [],
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "channel_description": channel_description,
+                "importance": importance,
+                "play_sound": play_sound,
+                "enable_vibration": enable_vibration,
+                "style": style.to_dict() if style else None,
+                "show_progress": show_progress,
+                "max_progress": max_progress,
+                "progress": progress,
+                "indeterminate": indeterminate,
+                "group_key": group_key,
+                "set_as_group_summary": set_as_group_summary,
+                "group_alert_behavior": group_alert_behavior,
+                "icon": icon,
+                "large_icon": large_icon,
+                "large_icon_type": large_icon_type,
+                "color": color,
+                "colorized": colorized,
+                "sound": sound,
+                "ongoing": ongoing,
+                "auto_cancel": auto_cancel,
+                "silent": silent,
+                "only_alert_once": only_alert_once,
+                "visibility": visibility,
+                "sub_text": sub_text,
+                "channel_bypass_dnd": channel_bypass_dnd,
+                "vibration_pattern": vibration_pattern,
+                "timeout_after": timeout_after,
+            },
+        )
+        return self._check_error(result)
+
+    async def get_active_notifications(self) -> list[dict]:
+        """Get all currently active (shown) notifications.
+
+        Returns:
+            List of dicts with keys: id, title, body, channel_id, payload.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="get_active_notifications",
+        )
+        self._check_error(result)
+        return json.loads(result)
+
+    async def get_pending_notifications(self) -> list[dict]:
+        """Get all pending (scheduled) notification requests.
+
+        Returns:
+            List of dicts with keys: id, title, body, payload.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="get_pending_notifications",
+        )
+        self._check_error(result)
+        return json.loads(result)
 
     async def cancel(self, notification_id: int):
         """Cancel a specific notification by ID.

@@ -1,43 +1,25 @@
 # flet-android-notifications
 
-Native Android notifications for Flet apps. Wraps the `flutter_local_notifications` Flutter plugin through a custom Flet extension, giving your Python code full access to Android's notification system.
+Native Android notifications for Flet apps. Bridges Python to the `flutter_local_notifications` plugin through a custom Flet extension.
 
-Flet has no built-in support for native notifications, and every obvious Python approach (plyer, Pyjnius, android-notify) fails because Flet's Python process is sandboxed from Android APIs. This extension solves that by bridging Python to Dart to the Flutter plugin.
-
-## Features
-
-- show, cancel, and cancel all notifications
-- schedule notifications for a future time (one-shot or recurring via AlarmManager)
-- notification action buttons (e.g. "Approve" / "Deny") with per-button callbacks
-- configurable notification channels (id, name, description, importance, sound, vibration)
-- tap and action callbacks with payload support
-- notification styles: big text, big picture, and inbox (expandable rich notifications)
-- progress bar notifications (determinate and indeterminate)
-- permission handling for Android 13+ and exact alarm permission for Android 14+
-- proper error propagation via `NotificationError`
+Flet has no built-in notification support, and Python-side approaches (plyer, Pyjnius) fail because Flet's Python process is sandboxed from Android APIs.
 
 ## Install
 
 ```bash
 pip install flet-android-notifications
-# or
-uv add flet-android-notifications
 ```
 
-In your app's `pyproject.toml`, declare the Android permission and tell Flet where to find the extension for APK builds:
+Add to your `pyproject.toml`:
 
 ```toml
 [project]
-dependencies = [
-    "flet>=0.80.5",
-    "flet-android-notifications",
-]
+dependencies = ["flet>=0.80.5", "flet-android-notifications"]
 
 [tool.flet.android.permission]
 "android.permission.POST_NOTIFICATIONS" = true
-# Required for scheduled notifications:
-"android.permission.SCHEDULE_EXACT_ALARM" = true
-"android.permission.RECEIVE_BOOT_COMPLETED" = true
+"android.permission.SCHEDULE_EXACT_ALARM" = true      # for scheduled/periodic
+"android.permission.RECEIVE_BOOT_COMPLETED" = true     # survive reboots
 
 [tool.flet.app]
 exclude = ["flet_android_notifications"]
@@ -46,271 +28,210 @@ exclude = ["flet_android_notifications"]
 flet-android-notifications = "flet_android_notifications"
 ```
 
-The `exclude` line prevents the extension source from being raw-copied into the APK, which would shadow the installed package and break imports.
-
-## Usage
+## Quick start
 
 ```python
-import json
 from datetime import datetime, timedelta
 import flet as ft
-from flet_android_notifications import FletAndroidNotifications, NotificationError
-
+from flet_android_notifications import FletAndroidNotifications
 
 def main(page: ft.Page):
+    notifications = FletAndroidNotifications()
 
-    def on_notification_tap(e):
-        data = json.loads(e.data)
-        payload = data.get("payload", "")
-        action_id = data.get("action_id", "")
-        print(f"tapped: payload={payload}, action={action_id}")
-
-    notifications = FletAndroidNotifications(
-        on_notification_tap=on_notification_tap,
-    )
-
-    async def send_now(e):
+    async def send(e):
         await notifications.request_permissions()
         await notifications.show_notification(
-            notification_id=1,
-            title="Hello",
-            body="This is an instant notification.",
+            notification_id=1, title="Hello", body="It works!",
         )
 
-    async def send_with_actions(e):
-        await notifications.request_permissions()
-        await notifications.show_notification(
-            notification_id=2,
-            title="Review request",
-            body="You have a task to review.",
-            payload="task_42",
-            actions=[
-                {"id": "approve", "title": "Approve"},
-                {"id": "deny", "title": "Deny"},
-            ],
-        )
-
-    async def schedule_30s(e):
-        await notifications.request_permissions()
-        await notifications.schedule_notification(
-            notification_id=10,
-            title="Reminder",
-            body="This fired 30 seconds after you pressed the button.",
-            scheduled_time=datetime.now() + timedelta(seconds=30),
-        )
-
-    page.add(
-        ft.Column([
-            ft.Button(content="Send now", on_click=send_now),
-            ft.Button(content="Send with actions", on_click=send_with_actions),
-            ft.Button(content="Schedule in 30s", on_click=schedule_30s),
-        ])
-    )
-
+    page.add(ft.Button(content="Send", on_click=send))
 
 ft.run(main)
 ```
 
-Just instantiate `FletAndroidNotifications`. Do not add it to `page.overlay` or `page.controls` -- it's a service, not a visual control, and it registers itself automatically.
+Instantiate `FletAndroidNotifications` once. Don't add it to `page.overlay` or `page.controls` — it's a service, not a visual control.
 
-See the [`examples/`](examples/) folder for more: [`simple.py`](examples/simple.py), [`action_buttons.py`](examples/action_buttons.py), [`scheduled.py`](examples/scheduled.py), [`big_text.py`](examples/big_text.py), [`notification_styles.py`](examples/notification_styles.py), [`advanced_options.py`](examples/advanced_options.py).
+See [`examples/`](examples/) for more: [simple](examples/simple.py), [action buttons](examples/action_buttons.py), [scheduled](examples/scheduled.py), [styles](examples/notification_styles.py), [periodic](examples/periodic.py), [timeout](examples/timeout.py), [query](examples/query_notifications.py).
 
-## API
+## API overview
 
-### `FletAndroidNotifications(on_notification_tap=callback)`
+### Core methods
 
-The service. Instantiate once. The `on_notification_tap` callback receives an event where `e.data` is a JSON string:
+| Method | Description |
+|---|---|
+| `show_notification(id, title, body, ...)` | show a notification immediately |
+| `schedule_notification(id, title, body, scheduled_time, ...)` | fire at a future time via AlarmManager |
+| `periodically_show(id, title, body, repeat_interval, ...)` | repeat every minute / hour / day / week |
+| `periodically_show_with_duration(id, title, body, duration_seconds, ...)` | repeat at a custom interval |
+| `cancel(notification_id)` | cancel one notification |
+| `cancel_all()` | cancel all notifications |
 
-```json
-{"payload": "task_42", "action_id": "approve"}
+### Query methods
+
+| Method | Returns |
+|---|---|
+| `get_active_notifications()` | `list[dict]` — currently displayed (id, title, body, channel_id, payload) |
+| `get_pending_notifications()` | `list[dict]` — scheduled/periodic (id, title, body, payload) |
+
+### Permission methods
+
+| Method | Returns |
+|---|---|
+| `request_permissions()` | `bool` — POST_NOTIFICATIONS (Android 13+) |
+| `request_exact_alarm_permission()` | `bool` — SCHEDULE_EXACT_ALARM (Android 14+) |
+
+### Tap callback
+
+```python
+import json
+
+def on_tap(e):
+    data = json.loads(e.data)  # {"payload": "...", "action_id": "..."}
+
+notifications = FletAndroidNotifications(on_notification_tap=on_tap)
 ```
 
-`action_id` is an empty string `""` when the user taps the notification body rather than an action button.
+`action_id` is `""` when the body is tapped (not an action button).
 
-### `await show_notification(...)`
+---
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `notification_id` | `int` | required | unique id for this notification |
-| `title` | `str` | required | notification title |
-| `body` | `str` | required | notification body text |
-| `payload` | `str` | `""` | arbitrary string returned in tap callback |
-| `actions` | `list[dict]` | `None` | action buttons, each `{"id": "...", "title": "..."}` |
-| `channel_id` | `str` | `"flet_notifications"` | Android notification channel id |
-| `channel_name` | `str` | `"Flet Notifications"` | channel name shown in system settings |
-| `channel_description` | `str` | `"Notifications from Flet app"` | channel description |
-| `importance` | `str` | `"high"` | one of `none`, `min`, `low`, `default`, `high`, `max` |
-| `play_sound` | `bool` | `True` | play default notification sound |
-| `enable_vibration` | `bool` | `True` | vibrate on notification |
-| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich notification style |
-| `show_progress` | `bool` | `False` | show a progress bar |
-| `max_progress` | `int` | `0` | maximum progress value |
-| `progress` | `int` | `0` | current progress value |
-| `indeterminate` | `bool` | `False` | indeterminate progress bar |
-| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
-| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
-| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
-| `icon` | `str\|None` | `None` | drawable resource name for small icon (e.g. `"ic_notification"`). None = app launcher icon. Android renders small icons as single-color silhouettes. |
-| `large_icon` | `str\|None` | `None` | large icon shown as thumbnail on right side |
-| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
-| `color` | `str\|None` | `None` | hex color (e.g. `"#FF5722"`) for accent color / small icon tint. See [Samsung color note](#samsung-oneui-notes). |
-| `colorized` | `bool` | `False` | apply color as background (foreground service / media-style only) |
-| `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"` for `res/raw/alert_tone.mp3`). Sound is permanently bound to the channel — changing it requires a different `channel_id`. |
-| `ongoing` | `bool` | `False` | persistent notification that can't be swiped away |
-| `auto_cancel` | `bool` | `True` | dismiss notification when tapped |
-| `silent` | `bool` | `False` | suppress sound and vibration |
-| `only_alert_once` | `bool` | `False` | only alert (sound/vibration) on first show; updates are silent |
-| `visibility` | `str\|None` | `None` | lock screen visibility: `"public"`, `"private"`, or `"secret"` |
-| `sub_text` | `str\|None` | `None` | small text shown below the notification content |
-| `channel_bypass_dnd` | `bool` | `False` | allow channel to bypass do-not-disturb (only takes effect when channel is first created) |
-| `vibration_pattern` | `list[int]\|None` | `None` | custom vibration pattern in ms, e.g. `[0, 500, 200, 500]` |
+## Notification parameters
 
-Raises `NotificationError` on failure.
+`show_notification`, `schedule_notification`, `periodically_show`, and `periodically_show_with_duration` all share a common set of parameters. Only the required ones differ per method.
 
-### `await schedule_notification(...)`
+### Required parameters
+
+| Parameter | `show` | `schedule` | `periodically_show` | `periodically_show_with_duration` |
+|---|---|---|---|---|
+| `notification_id` | int | int | int | int |
+| `title` | str | str | str | str |
+| `body` | str | str | str | str |
+| `scheduled_time` | — | datetime | — | — |
+| `repeat_interval` | — | — | str | — |
+| `duration_seconds` | — | — | — | int\|float |
+
+`repeat_interval` is one of `"every_minute"`, `"hourly"`, `"daily"`, `"weekly"`.
+
+### Common optional parameters
+
+These work on all four methods above.
+
+**Basics:**
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `notification_id` | `int` | required | unique id for this notification |
-| `title` | `str` | required | notification title |
-| `body` | `str` | required | notification body text |
-| `scheduled_time` | `datetime` | required | when to fire; naive = local time, aware = converted to UTC |
-| `payload` | `str` | `""` | arbitrary string returned in tap callback |
-| `actions` | `list[dict]` | `None` | action buttons, each `{"id": "...", "title": "..."}` |
-| `channel_id` | `str` | `"flet_notifications"` | Android notification channel id |
-| `channel_name` | `str` | `"Flet Notifications"` | channel name shown in system settings |
-| `channel_description` | `str` | `"Notifications from Flet app"` | channel description |
-| `importance` | `str` | `"high"` | one of `none`, `min`, `low`, `default`, `high`, `max` |
-| `play_sound` | `bool` | `True` | play default notification sound |
-| `enable_vibration` | `bool` | `True` | vibrate on notification |
-| `schedule_mode` | `str` | `"inexact_allow_while_idle"` | how Android schedules the alarm (see table below) |
-| `match_date_time_components` | `str\|None` | `None` | for recurring: `"time"` (daily), `"day_of_week_and_time"` (weekly), `"day_of_month_and_time"` (monthly), `"date_and_time"` (yearly), or `None` (one-shot) |
-| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich notification style |
-| `show_progress` | `bool` | `False` | show a progress bar |
-| `max_progress` | `int` | `0` | maximum progress value |
-| `progress` | `int` | `0` | current progress value |
-| `indeterminate` | `bool` | `False` | indeterminate progress bar |
-| `group_key` | `str\|None` | `None` | group key for bundling notifications together |
-| `set_as_group_summary` | `bool` | `False` | if True, this is the group summary notification |
-| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, or `"children"` |
-| `icon` | `str\|None` | `None` | drawable resource name for small icon |
-| `large_icon` | `str\|None` | `None` | large icon thumbnail on right side |
-| `large_icon_type` | `str` | `"drawable_resource"` | `"drawable_resource"` or `"file_path"` |
-| `color` | `str\|None` | `None` | hex color for accent / small icon tint |
-| `colorized` | `bool` | `False` | apply color as background (foreground service only) |
-| `sound` | `str\|None` | `None` | raw resource name for custom sound |
-| `ongoing` | `bool` | `False` | persistent notification that can't be swiped away |
-| `auto_cancel` | `bool` | `True` | dismiss notification when tapped |
-| `silent` | `bool` | `False` | suppress sound and vibration |
-| `only_alert_once` | `bool` | `False` | only alert on first show; updates are silent |
-| `visibility` | `str\|None` | `None` | lock screen visibility: `"public"`, `"private"`, or `"secret"` |
-| `sub_text` | `str\|None` | `None` | small text shown below the notification content |
-| `channel_bypass_dnd` | `bool` | `False` | allow channel to bypass do-not-disturb |
-| `vibration_pattern` | `list[int]\|None` | `None` | custom vibration pattern in ms, e.g. `[0, 500, 200, 500]` |
+| `payload` | `str` | `""` | returned in tap callback |
+| `actions` | `list[dict]` | `None` | buttons: `[{"id": "...", "title": "..."}]` |
+| `importance` | `str` | `"high"` | `none`, `min`, `low`, `default`, `high`, `max` |
+| `timeout_after` | `int\|None` | `None` | auto-dismiss after N milliseconds |
 
-Raises `NotificationError` on failure.
+**Channel:**
 
-#### Schedule modes
+| Parameter | Type | Default |
+|---|---|---|
+| `channel_id` | `str` | `"flet_notifications"` |
+| `channel_name` | `str` | `"Flet Notifications"` |
+| `channel_description` | `str` | `"Notifications from Flet app"` |
+| `channel_bypass_dnd` | `bool` | `False` |
 
-| Mode | Needs `SCHEDULE_EXACT_ALARM`? | Fires during Doze? | Notes |
+**Appearance:**
+
+| Parameter | Type | Default | Description |
 |---|---|---|---|
-| `"inexact"` | No | No | Battery-friendly, may be deferred |
-| `"inexact_allow_while_idle"` | No | Yes | Safe default, no special permission needed |
-| `"exact"` | Yes | No | Exact time, but deferred during Doze |
-| `"exact_allow_while_idle"` | Yes | Yes | Exact time, fires even in Doze |
-| `"alarm_clock"` | Yes | Yes | Shows alarm icon in status bar |
+| `icon` | `str\|None` | `None` | drawable resource for small icon |
+| `large_icon` | `str\|None` | `None` | thumbnail on right side |
+| `large_icon_type` | `str` | `"drawable_resource"` | or `"file_path"` |
+| `color` | `str\|None` | `None` | hex accent color, e.g. `"#FF5722"` |
+| `colorized` | `bool` | `False` | color as background (foreground service only) |
+| `sub_text` | `str\|None` | `None` | small text below content |
+| `visibility` | `str\|None` | `None` | `"public"`, `"private"`, or `"secret"` |
 
-#### Notification styles
+**Behavior:**
 
-Use style classes to create rich expandable notifications:
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `play_sound` | `bool` | `True` | play notification sound |
+| `enable_vibration` | `bool` | `True` | vibrate |
+| `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"`) |
+| `vibration_pattern` | `list[int]\|None` | `None` | e.g. `[0, 500, 200, 500]` |
+| `ongoing` | `bool` | `False` | can't be swiped away |
+| `auto_cancel` | `bool` | `True` | dismiss on tap |
+| `silent` | `bool` | `False` | suppress sound and vibration |
+| `only_alert_once` | `bool` | `False` | alert on first show only |
+
+**Styles and progress:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich expandable style |
+| `show_progress` | `bool` | `False` | show progress bar |
+| `max_progress` | `int` | `0` | max value |
+| `progress` | `int` | `0` | current value |
+| `indeterminate` | `bool` | `False` | spinning progress bar |
+
+**Grouping:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `group_key` | `str\|None` | `None` | bundle notifications together |
+| `set_as_group_summary` | `bool` | `False` | this is the group summary |
+| `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, `"children"` |
+
+### Schedule-only parameters
+
+These only apply to `schedule_notification`:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `schedule_mode` | `str` | `"inexact_allow_while_idle"` | see table below |
+| `match_date_time_components` | `str\|None` | `None` | `"time"` (daily), `"day_of_week_and_time"` (weekly), `"day_of_month_and_time"` (monthly), `"date_and_time"` (yearly) |
+
+**Schedule modes:**
+
+| Mode | Exact alarm permission? | Fires in Doze? |
+|---|---|---|
+| `"inexact"` | no | no |
+| `"inexact_allow_while_idle"` | no | yes |
+| `"exact"` | yes | no |
+| `"exact_allow_while_idle"` | yes | yes |
+| `"alarm_clock"` | yes | yes |
+
+---
+
+## Styles
 
 ```python
 from flet_android_notifications import BigTextStyle, BigPictureStyle, InboxStyle
 
-# big text — expands to show longer content
-await notifications.show_notification(
-    notification_id=1, title="Report", body="Summary ready.",
-    style=BigTextStyle("Full detailed report text here...",
-                       content_title="Report — expanded",
-                       summary_text="3 items"),
-)
+# expandable long text
+style=BigTextStyle("Full text here...", content_title="Expanded title")
 
-# big picture — shows an image when expanded
-await notifications.show_notification(
-    notification_id=2, title="Photo", body="New photo.",
-    style=BigPictureStyle(drawable_resource="ic_launcher_foreground"),
-)
+# full-width image when expanded
+style=BigPictureStyle(drawable_resource="splash")
 
-# inbox — shows a list of lines when expanded
-await notifications.show_notification(
-    notification_id=3, title="3 messages", body="You have mail.",
-    style=InboxStyle(["Alice: Hi", "Bob: Done", "Carol: OK"],
-                     summary_text="from 3 contacts"),
-)
-
-# progress bar
-await notifications.show_notification(
-    notification_id=4, title="Uploading", body="45%",
-    show_progress=True, max_progress=100, progress=45,
-)
+# list of lines
+style=InboxStyle(["Line 1", "Line 2", "Line 3"], summary_text="3 items")
 ```
-
-#### Advanced options
-
-Use `ongoing` and `silent` together for a persistent download tracker that doesn't interrupt the user:
-
-```python
-await notifications.show_notification(
-    notification_id=10, title="Downloading", body="45%",
-    ongoing=True, silent=True,
-    show_progress=True, max_progress=100, progress=45,
-)
-```
-
-Use `visibility` to hide sensitive content on the lock screen:
-
-```python
-await notifications.show_notification(
-    notification_id=11, title="New message", body="Contents hidden.",
-    visibility="secret",
-)
-```
-
-### `await request_exact_alarm_permission()`
-
-Request the `SCHEDULE_EXACT_ALARM` permission (required on Android 14+ for exact schedule modes). Returns `True` if granted, `False` if denied. Inexact modes do not need this permission.
-
-### `await cancel(notification_id)`
-
-Cancel a specific notification by id.
-
-### `await cancel_all()`
-
-Cancel all active notifications.
-
-### `await request_permissions()`
-
-Request the POST_NOTIFICATIONS runtime permission (required on Android 13+). Returns `True` if granted, `False` if denied.
 
 ## Building the APK
 
 ```bash
-# first build -- generates Flutter template, will likely fail at Gradle
+# first build — generates Flutter template, may fail at Gradle
 flet build apk -v
 
 # patch desugaring into build/flutter/android/app/build.gradle.kts:
 #   android { compileOptions { isCoreLibraryDesugaringEnabled = true } }
 #   dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }
 
-# rebuild -- the patch survives because the template hash is unchanged
+# rebuild
 flet build apk -v
 ```
 
-The desugaring patch is needed because `flutter_local_notifications` v19+ uses Java 8 APIs that aren't available on older Android versions without it. You only need to apply this once per clean build directory.
+The desugaring patch is needed because `flutter_local_notifications` v19+ uses Java 8 APIs. Apply once per clean build directory.
 
-### AndroidManifest.xml setup for scheduled notifications
+### AndroidManifest.xml for scheduled notifications
 
-If you use `schedule_notification()`, you must register the plugin's BroadcastReceivers so that scheduled notifications survive app restarts and device reboots. After your first `flet build apk`, add the following inside the `<application>` tag in `build/flutter/android/app/src/main/AndroidManifest.xml`:
+Register BroadcastReceivers inside `<application>` in `build/flutter/android/app/src/main/AndroidManifest.xml` so scheduled notifications survive reboots:
 
 ```xml
 <receiver android:exported="false"
@@ -326,37 +247,23 @@ If you use `schedule_notification()`, you must register the plugin's BroadcastRe
 </receiver>
 ```
 
-Without these receivers, scheduled notifications will fire while the app is running but will be lost if the app is killed or the device restarts.
-
-On Windows, set `PYTHONIOENCODING=utf-8` before building to avoid Unicode crashes from Rich's spinner characters.
-
 ### Installing on device
 
-Always do a full uninstall before installing a new APK. Flet's `serious_python` caches the extracted Python environment and won't pick up code changes with `adb install -r`:
+Always full-uninstall before installing. Flet caches the extracted Python environment:
 
 ```bash
 adb uninstall com.yourapp.package
 adb install build/apk/app-release.apk
 ```
 
-## Samsung OneUI notes
+On Windows, set `PYTHONIOENCODING=utf-8` before building to avoid Unicode crashes.
 
-Samsung OneUI overrides some standard Android notification behaviors:
+## Custom resources
 
-- **Color**: Samsung's system color palette overrides the programmatic `color` parameter. The accent color / small icon tint works on stock Android (Pixel, AOSP) but is ignored on Samsung. Users can disable this in Settings > Wallpaper and style > Color palette, or via Good Lock's QuickStar module.
-- **Brief mode**: Samsung's default compact notification view hides expanded content (large icons, styles, color). Users must swipe down on a notification to see the full expanded view.
-- **`colorized`**: only works for foreground service and media-style notifications on all Android devices, not just Samsung.
+- **Small icons**: vector drawable XML in `res/drawable/` (24dp, white on transparent)
+- **Sounds**: audio files in `res/raw/`, reference by name without extension: `sound="alert_tone"`
 
-These are OEM-level behaviors and cannot be overridden from app code.
-
-## Custom resources (icons, sounds)
-
-To use custom small icons or notification sounds, place the resource files in your Android `res/` directory:
-
-- **Small icons**: add a vector drawable XML to `res/drawable/` (24dp, white on transparent). Android renders small icons as single-color silhouettes.
-- **Sounds**: add audio files (WAV, MP3, OGG) to `res/raw/`. Reference by name without extension: `sound="alert_tone"` for `res/raw/alert_tone.mp3`.
-
-**Important**: resources only referenced at runtime (via `icon="..."` or `sound="..."`) may be stripped by Android's resource optimizer. Add a `res/raw/keep.xml` file to prevent this:
+Add `res/raw/keep.xml` to prevent resource stripping:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -364,27 +271,29 @@ To use custom small icons or notification sounds, place the resource files in yo
     tools:keep="@raw/*,@drawable/ic_*" />
 ```
 
-Sound is permanently bound to a notification channel at creation. To change the sound, use a different `channel_id` or uninstall the app to reset all channels.
+Sound is permanently bound to a channel at creation. Change the sound by using a different `channel_id`.
+
+## Samsung OneUI notes
+
+- **Color**: Samsung's system palette overrides the `color` parameter. Works on stock Android, ignored on Samsung.
+- **Brief mode**: Samsung's compact notification view hides expanded content. Swipe down to expand.
+- **`colorized`**: only works for foreground service / media-style notifications (all OEMs).
 
 ## Limitations
 
-- Android only. The extension wraps `flutter_local_notifications` which supports iOS too, but the Python/Dart code here only configures the Android side. iOS support would need `DarwinNotificationDetails` in the Dart layer.
-- Desktop does nothing. On desktop, the service instantiates without error but notifications won't appear since there's no native plugin backing it.
+- **Android only.** iOS support would need `DarwinNotificationDetails` in the Dart layer.
+- **Desktop**: the service instantiates without error but notifications won't appear.
 
 ## How it works
 
-Flet's architecture is `Python <-> Flet protocol <-> Flutter/Dart <-> platform APIs`. Python can't call Android APIs directly. This extension bridges that gap:
-
 ```
-your Python app
-  -> FletAndroidNotifications (ft.Service)
-    -> _invoke_method() over Flet protocol
-      -> NotificationsService (FletService, Dart)
-        -> flutter_local_notifications plugin
-          -> Android NotificationManager
+Python app → FletAndroidNotifications (ft.Service)
+  → _invoke_method() over Flet protocol
+    → NotificationsService (FletService, Dart)
+      → flutter_local_notifications plugin → Android NotificationManager
 ```
 
-The extension is packaged as a standard Python package with a `flutter/` namespace directory containing the Dart code. When you run `flet build apk`, Flet discovers the Dart code in site-packages and includes it as a path dependency in the generated Flutter project.
+The extension ships as a Python package with a `flutter/` directory containing the Dart code. `flet build apk` discovers it in site-packages and includes it as a Flutter path dependency.
 
 ## License
 

@@ -1,166 +1,46 @@
 # Examples
 
-Six standalone examples, each demonstrating a different feature. To test any of them, copy it to your project as `main.py` and build with `flet build apk -v`.
+Nine standalone examples. Copy any to your project as `main.py` and build with `flet build apk -v`.
 
-## simple.py — Basic notification
+| Example | What it demonstrates |
+|---|---|
+| [`simple.py`](simple.py) | one button, one notification — minimal setup |
+| [`action_buttons.py`](action_buttons.py) | Approve / Deny action buttons with tap callback |
+| [`scheduled.py`](scheduled.py) | fire a notification 30s in the future, cancel pending |
+| [`big_text.py`](big_text.py) | expandable long text notification |
+| [`notification_styles.py`](notification_styles.py) | big text, big picture, inbox, and progress bar styles |
+| [`advanced_options.py`](advanced_options.py) | ongoing, silent, only-alert-once, visibility, sub text, DnD bypass, custom vibration |
+| [`periodic.py`](periodic.py) | repeating notifications (every minute, custom 90s interval) |
+| [`timeout.py`](timeout.py) | auto-dismissing notifications (5s, 10s, no timeout) |
+| [`query_notifications.py`](query_notifications.py) | inspect active (displayed) and pending (scheduled) notifications |
 
-The simplest possible usage. One button, one notification.
+## What to look for
 
-**What it does**: Tapping "Send notification" shows a notification with the title "Hello".
+**simple** — tap button, notification appears. That's it.
 
-**What to test**:
-- Tap the button — a notification should appear immediately
-- Tap the notification — nothing visible happens (no tap handler in this example)
+**action_buttons** — notification shows Approve / Deny buttons. Tapping one updates in-app status text with the action id and payload.
 
-**Expected output**:
-```
-[Button: "Send notification"]
+**scheduled** — schedule fires in ~30s even if the app is killed. "Cancel all" prevents pending notifications from firing.
 
--> tap button
--> notification appears: title="Hello", body="This is a basic notification."
-```
+**big_text** — swipe down on the notification to see the expanded text. Collapsed view shows the short body.
 
-## action_buttons.py — Notifications with Approve / Deny buttons
+**notification_styles** — four buttons, each a different style. Big text and inbox expand on swipe-down. Big picture shows a full-width image. Progress bar shows at 45%.
 
-Shows a notification with two action buttons. Tapping an action updates the status text with a color.
+**advanced_options** — eight buttons, each isolating one param. Ongoing can't be swiped away. Silent has no sound/vibration. Secret is hidden on lock screen. Custom vibration has a distinct buzz pattern.
 
-**What it does**: Tapping "Send notification" shows a notification with "Approve" (green) and "Deny" (red) action buttons. The response is shown in-app.
+**periodic** — "Every minute" starts repeating. "Cancel all" stops it. Android may batch or delay in doze mode.
 
-**What to test**:
-- Tap "Send notification" — notification appears with two action buttons
-- Tap "Approve" on the notification — status text turns green with "Approved: task_42"
-- Send again, tap "Deny" — status text turns red with "Denied: task_42"
-- Send again, tap the notification body (not a button) — status shows "Tapped: task_42"
+**timeout** — 5s/10s notifications vanish from the shade on their own. Compare with "No timeout" which stays.
 
-**Expected output**:
-```
-[Button: "Send notification"]
-No response yet
+**query** — send some notifications, then tap "Get active" to see what's displayed. Schedule some, then "Get pending" to see what's queued. Results shown as JSON in the app.
 
--> tap button, then tap "Approve" on notification
-[Button: "Send notification"]
-Approved: task_42          <- green text
-```
-
-## scheduled.py — Scheduled notifications
-
-Notifications that fire in the future, even if the app is killed.
-
-**What it does**: Schedule a one-shot notification 30 seconds from now. Cancel all pending schedules.
-
-**What to test**:
-- Tap "Schedule in 30s" — status shows the target time, notification fires ~30s later
-- Tap "Schedule in 30s", then kill the app (swipe from recents) — notification still fires
-- Tap "Cancel all" before a scheduled notification fires — it should not fire
-
-**Expected output**:
-```
-[Button: "Schedule in 30s"]
-[Button: "Cancel all"]
-
--> tap "Schedule in 30s"
-Scheduled for 14:32:15
-
--> wait 30 seconds
--> notification appears: title="Reminder", body="Scheduled for 14:32:15"
-```
-
-## big_text.py — Big text notification
-
-Shows a notification that expands to reveal a longer message when pulled down.
-
-**What it does**: Tapping "Send big text notification" shows a notification with a short body. Pulling down on the notification reveals the full expanded text.
-
-**What to test**:
-- Tap the button — notification appears with "Your weekly summary is ready."
-- Pull down on the notification — expanded text shows the full summary with a different title and summary line
-
-**Expected output**:
-```
-[Button: "Send big text notification"]
-
--> tap button
--> notification appears: title="Weekly report", body="Your weekly summary is ready."
--> pull down on notification
--> expanded: title="Weekly report — expanded", full summary text, summary="12 tasks completed"
-```
-
-## notification_styles.py — All notification styles
-
-Four buttons showcasing big text, big picture, inbox, and progress bar styles.
-
-**What it does**: Each button sends a notification with a different style. Big text expands to show long text, big picture shows an image, inbox shows multiple message lines, and progress bar shows a determinate progress indicator.
-
-**What to test**:
-- Tap "Big text" — notification expands to show wrapped multi-line text
-- Tap "Big picture" — notification expands to show the app icon as a large image
-- Tap "Inbox" — notification expands to show 3 message lines
-- Tap "Progress bar" — notification shows a progress bar at 45%
-
-**Expected output**:
-```
-[Button: "Big text"]
-[Button: "Big picture"]
-[Button: "Inbox"]
-[Button: "Progress bar"]
-
--> tap "Big text" -> expandable long text notification
--> tap "Big picture" -> notification with app icon image
--> tap "Inbox" -> notification with 3 message lines
--> tap "Progress bar" -> notification with 45% progress bar
-```
-
-## advanced_options.py — Advanced notification options
-
-Eight buttons, each demonstrating one advanced parameter in isolation.
-
-**What it does**: Each button sends a notification with a specific option (ongoing, silent, only-alert-once, visibility, sub text, DnD bypass, custom vibration, or ongoing + no auto-cancel).
-
-**What to test**:
-- Tap "Ongoing" — notification stays when you try to swipe it away
-- Tap "Silent" — notification appears without sound or vibration
-- Tap "Only alert once" twice — the second tap updates silently
-- Tap "Lock screen: secret" — notification is hidden on the lock screen
-- Tap "Sub text" — "via Email" appears below the notification content
-- Tap "Bypass DnD" — enable do-not-disturb first, notification should still appear
-- Tap "Custom vibration" — feel a distinct wait-buzz-pause-buzz pattern
-- Tap "Ongoing + no cancel" — can't swipe away and tapping doesn't dismiss
-
-**Expected output**:
-```
-[Button: "Ongoing"]
-[Button: "Silent"]
-[Button: "Only alert once"]
-[Button: "Lock screen: secret"]
-[Button: "Sub text"]
-[Button: "Bypass DnD"]
-[Button: "Custom vibration"]
-[Button: "Ongoing + no cancel"]
-
--> tap "Ongoing" -> persistent notification, can't swipe away
--> tap "Silent" -> notification appears silently
--> tap "Only alert once" x2 -> second update is silent
--> tap "Lock screen: secret" -> hidden on lock screen
--> tap "Sub text" -> "via Email" shown below content
--> tap "Bypass DnD" -> appears even in DnD mode
--> tap "Custom vibration" -> custom vibration pattern
--> tap "Ongoing + no cancel" -> sticky, tap doesn't dismiss
-```
-
-## Building and deploying
-
-Each example needs a `pyproject.toml` with the Flet configuration. From the repo root:
+## Building
 
 ```bash
-# copy the example you want to test
 cp examples/simple.py main.py
-
-# build
 flet build apk -v
-
-# deploy (full uninstall required — Flet caches the Python environment)
 adb uninstall com.flet.flet_android_notifications_demo
 adb install build/apk/app-release.apk
 ```
 
-See the main [README](../README.md) for desugaring patch and AndroidManifest setup instructions.
+See the main [README](../README.md) for desugaring patch and AndroidManifest setup.

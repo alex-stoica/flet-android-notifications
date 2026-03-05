@@ -40,7 +40,7 @@ class NotificationsService extends FletService {
       const initSettings = InitializationSettings(android: androidSettings);
 
       final result = await _plugin.initialize(
-        initializationSettings: initSettings,
+        settings: initSettings,
         onDidReceiveNotificationResponse: (response) {
           final hasAction = response.actionId != null && response.actionId!.isNotEmpty;
           // Debounce only body taps — Samsung OneUI fires phantom body taps
@@ -221,6 +221,21 @@ class NotificationsService extends FletService {
     }
   }
 
+  RepeatInterval _parseRepeatInterval(String value) {
+    switch (value) {
+      case "every_minute":
+        return RepeatInterval.everyMinute;
+      case "hourly":
+        return RepeatInterval.hourly;
+      case "daily":
+        return RepeatInterval.daily;
+      case "weekly":
+        return RepeatInterval.weekly;
+      default:
+        return RepeatInterval.daily;
+    }
+  }
+
   NotificationDetails _buildNotificationDetails({
     required String channelId,
     required String channelName,
@@ -251,6 +266,7 @@ class NotificationsService extends FletService {
     String? subText,
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
+    int? timeoutAfter,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -282,6 +298,7 @@ class NotificationsService extends FletService {
       subText: subText,
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
+      timeoutAfter: timeoutAfter,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -346,6 +363,7 @@ class NotificationsService extends FletService {
                 ? Int64List.fromList(
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
+            timeoutAfter: a["timeout_after"] as int?,
           );
           return "ok";
         case "schedule_notification":
@@ -399,8 +417,140 @@ class NotificationsService extends FletService {
                 ? Int64List.fromList(
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
+            timeoutAfter: a["timeout_after"] as int?,
           );
           return "ok";
+        case "periodically_show":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
+          final details = _buildNotificationDetails(
+            channelId: a["channel_id"] as String,
+            channelName: a["channel_name"] as String,
+            channelDescription: a["channel_description"] as String,
+            importance: importance,
+            priority: _priorityFromImportance(importance),
+            playSound: a["play_sound"] as bool,
+            enableVibration: a["enable_vibration"] as bool,
+            actions: _parseActions(a["actions"] as List<dynamic>),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
+            ongoing: a["ongoing"] as bool? ?? false,
+            autoCancel: a["auto_cancel"] as bool? ?? true,
+            silent: a["silent"] as bool? ?? false,
+            onlyAlertOnce: a["only_alert_once"] as bool? ?? false,
+            visibility: _parseVisibility(a["visibility"] as String?),
+            subText: a["sub_text"] as String?,
+            channelBypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            vibrationPattern: a["vibration_pattern"] != null
+                ? Int64List.fromList(
+                    (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                : null,
+            timeoutAfter: a["timeout_after"] as int?,
+          );
+          await _plugin.periodicallyShow(
+            id: a["id"] as int,
+            title: a["title"] as String,
+            body: a["body"] as String,
+            notificationDetails: details,
+            repeatInterval: _parseRepeatInterval(a["repeat_interval"] as String),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            payload: a["payload"] as String,
+          );
+          return "ok";
+        case "periodically_show_with_duration":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
+          final details = _buildNotificationDetails(
+            channelId: a["channel_id"] as String,
+            channelName: a["channel_name"] as String,
+            channelDescription: a["channel_description"] as String,
+            importance: importance,
+            priority: _priorityFromImportance(importance),
+            playSound: a["play_sound"] as bool,
+            enableVibration: a["enable_vibration"] as bool,
+            actions: _parseActions(a["actions"] as List<dynamic>),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
+            ongoing: a["ongoing"] as bool? ?? false,
+            autoCancel: a["auto_cancel"] as bool? ?? true,
+            silent: a["silent"] as bool? ?? false,
+            onlyAlertOnce: a["only_alert_once"] as bool? ?? false,
+            visibility: _parseVisibility(a["visibility"] as String?),
+            subText: a["sub_text"] as String?,
+            channelBypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            vibrationPattern: a["vibration_pattern"] != null
+                ? Int64List.fromList(
+                    (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                : null,
+            timeoutAfter: a["timeout_after"] as int?,
+          );
+          await _plugin.periodicallyShowWithDuration(
+            id: a["id"] as int,
+            title: a["title"] as String,
+            body: a["body"] as String,
+            notificationDetails: details,
+            repeatDurationInterval: Duration(milliseconds: a["duration_ms"] as int),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            payload: a["payload"] as String,
+          );
+          return "ok";
+        case "get_active_notifications":
+          await _ensureInitialized();
+          final active = await _plugin.getActiveNotifications();
+          final list = active.map((n) => {
+            "id": n.id,
+            "title": n.title ?? "",
+            "body": n.body ?? "",
+            "channel_id": n.channelId ?? "",
+            "payload": n.payload ?? "",
+          }).toList();
+          return jsonEncode(list);
+        case "get_pending_notifications":
+          await _ensureInitialized();
+          final pending = await _plugin.pendingNotificationRequests();
+          final list = pending.map((n) => {
+            "id": n.id,
+            "title": n.title ?? "",
+            "body": n.body ?? "",
+            "payload": n.payload ?? "",
+          }).toList();
+          return jsonEncode(list);
         case "cancel":
           final a = Map<String, dynamic>.from(args as Map);
           await _plugin.cancel(id: a["id"] as int);
@@ -455,6 +605,7 @@ class NotificationsService extends FletService {
     String? subText,
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
+    int? timeoutAfter,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -492,6 +643,7 @@ class NotificationsService extends FletService {
       subText: subText,
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
+      timeoutAfter: timeoutAfter,
     );
 
     await _plugin.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
@@ -534,6 +686,7 @@ class NotificationsService extends FletService {
     String? subText,
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
+    int? timeoutAfter,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -575,6 +728,7 @@ class NotificationsService extends FletService {
       subText: subText,
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
+      timeoutAfter: timeoutAfter,
     );
 
     await _plugin.zonedSchedule(

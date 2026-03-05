@@ -1,12 +1,20 @@
-"""Diagnostic test app for grouping, icons, color, and sound.
+"""Diagnostic test app for all notification features.
 
 Each button tests a single feature. Status text shows OK/FAIL + notification ID.
 Instructions under each button explain what to look for on the device.
 """
 
+import asyncio
+import json
 import traceback
+from datetime import datetime, timedelta
 import flet as ft
-from flet_android_notifications import FletAndroidNotifications, InboxStyle, BigPictureStyle
+from flet_android_notifications import (
+    FletAndroidNotifications,
+    InboxStyle,
+    BigPictureStyle,
+    BigTextStyle,
+)
 
 
 def main(page: ft.Page):
@@ -27,6 +35,11 @@ def main(page: ft.Page):
     def set_log(msg):
         log.value = msg
         page.update()
+
+    def on_tap(e):
+        set_log(f"TAP event: {e.data}")
+
+    notifications.on_notification_tap = on_tap
 
     async def request(e):
         granted = await notifications.request_permissions()
@@ -95,7 +108,7 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL group: {type(ex).__name__}: {ex}")
 
-    # -- 4. large icon (thumbnail) --
+    # -- 4a. large icon (thumbnail) --
     async def send_large_icon(e):
         try:
             nid = next_id()
@@ -130,11 +143,10 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL big picture: {type(ex).__name__}: {ex}")
 
-    # -- 5. custom small icon contrast test --
+    # -- 5. default small icon contrast test --
     async def send_small_icon(e):
         try:
             nid = next_id()
-            # use default icon (no icon param) so user can compare with bell
             await notifications.show_notification(
                 notification_id=nid,
                 title=f"DEFAULT ICON #{nid}",
@@ -179,6 +191,266 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL silent: {type(ex).__name__}: {ex}")
 
+    # -- 8. big text style --
+    async def send_big_text(e):
+        try:
+            nid = next_id()
+            long_text = (
+                "This is a much longer notification body that demonstrates the BigTextStyle. "
+                "When you expand the notification by swiping down, you should see all of this text "
+                "displayed in full instead of being truncated to a single line. "
+                "This is useful for showing email previews, long messages, or detailed alerts."
+            )
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"BIG TEXT #{nid}",
+                body="Expand to read the full message...",
+                style=BigTextStyle(
+                    big_text=long_text,
+                    content_title="Big text — expanded",
+                    summary_text="detailed content",
+                ),
+                icon="ic_notification",
+            )
+            set_log(f"OK big text #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL big text: {type(ex).__name__}: {ex}")
+
+    # -- 9. progress bar (determinate) --
+    async def send_progress(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"PROGRESS #{nid}",
+                body="Downloading... 65%",
+                show_progress=True,
+                max_progress=100,
+                progress=65,
+                ongoing=True,
+                icon="ic_notification",
+            )
+            set_log(f"OK progress #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL progress: {type(ex).__name__}: {ex}")
+
+    # -- 10. progress bar (indeterminate) --
+    async def send_indeterminate(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"INDETERMINATE #{nid}",
+                body="Processing...",
+                show_progress=True,
+                indeterminate=True,
+                ongoing=True,
+                icon="ic_notification",
+            )
+            set_log(f"OK indeterminate #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL indeterminate: {type(ex).__name__}: {ex}")
+
+    # -- 11. ongoing (can't swipe away) --
+    async def send_ongoing(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"ONGOING #{nid}",
+                body="This can't be swiped away. Use cancel all to dismiss.",
+                ongoing=True,
+                auto_cancel=False,
+                channel_id="ongoing_ch",
+                channel_name="Ongoing",
+                importance="default",
+                icon="ic_notification",
+            )
+            set_log(f"OK ongoing #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL ongoing: {type(ex).__name__}: {ex}")
+
+    # -- 12. action buttons --
+    async def send_actions(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"ACTIONS #{nid}",
+                body="Tap an action button below.",
+                payload=f"payload_for_{nid}",
+                actions=[
+                    {"id": "approve", "title": "Approve"},
+                    {"id": "deny", "title": "Deny"},
+                ],
+                icon="ic_notification",
+            )
+            set_log(f"OK actions #{nid} — tap an action, check log")
+        except Exception as ex:
+            set_log(f"FAIL actions: {type(ex).__name__}: {ex}")
+
+    # -- 13. sub text --
+    async def send_sub_text(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"SUB TEXT #{nid}",
+                body="Check header line: AppName \u2022 sub_text \u2022 time.",
+                sub_text="HELLO-SUB-TEXT",
+                channel_id="subtext_ch",
+                channel_name="Sub Text",
+                icon="ic_notification",
+            )
+            set_log(f"OK sub text #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL sub text: {type(ex).__name__}: {ex}")
+
+    # -- 14. visibility (secret — hidden on lock screen) --
+    async def send_visibility(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"SECRET #{nid}",
+                body="This should NOT appear on lock screen.",
+                visibility="secret",
+                channel_id="secret_ch",
+                channel_name="Secret",
+                importance="min",
+                icon="ic_notification",
+            )
+            set_log(f"OK secret #{nid} — lock screen to verify")
+        except Exception as ex:
+            set_log(f"FAIL visibility: {type(ex).__name__}: {ex}")
+
+    # -- 15. only alert once --
+    async def send_only_alert_once(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"ALERT ONCE #{nid}",
+                body="First show — you should hear a sound NOW.",
+                only_alert_once=True,
+                channel_id="alert_once_ch",
+                channel_name="Alert Once",
+                icon="ic_notification",
+            )
+            await asyncio.sleep(2)
+            # update same ID but on a silent channel — guarantees no re-alert
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"ALERT ONCE #{nid} (updated silently)",
+                body="This update was SILENT — no sound or vibration.",
+                only_alert_once=True,
+                silent=True,
+                play_sound=False,
+                enable_vibration=False,
+                channel_id="alert_once_silent_ch",
+                channel_name="Alert Once Silent",
+                importance="low",
+                icon="ic_notification",
+            )
+            set_log(f"OK alert once #{nid} — second show was silent")
+        except Exception as ex:
+            set_log(f"FAIL only alert once: {type(ex).__name__}: {ex}")
+
+    # -- 16. custom vibration pattern --
+    async def send_vibration(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"VIBRATION #{nid}",
+                body="3 short buzzes with long pauses (no sound).",
+                vibration_pattern=[0, 200, 1000, 200, 1000, 200],
+                play_sound=False,
+                channel_id="vibration_ch3",
+                channel_name="Vibration Pattern",
+                icon="ic_notification",
+            )
+            set_log(f"OK vibration #{nid}")
+        except Exception as ex:
+            set_log(f"FAIL vibration: {type(ex).__name__}: {ex}")
+
+    # -- 17. scheduled notification (10 seconds from now) --
+    async def send_scheduled(e):
+        try:
+            nid = next_id()
+            fire_at = datetime.now() + timedelta(seconds=10)
+            await notifications.schedule_notification(
+                notification_id=nid,
+                title=f"SCHEDULED #{nid}",
+                body=f"Fired at {fire_at.strftime('%H:%M:%S')} (10s delay).",
+                scheduled_time=fire_at,
+                icon="ic_notification",
+            )
+            set_log(f"OK scheduled #{nid} — fires in ~10s")
+        except Exception as ex:
+            set_log(f"FAIL scheduled: {type(ex).__name__}: {ex}")
+
+    # -- 18. timeout_after (auto-dismiss after 5s) --
+    async def send_timeout(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title=f"TIMEOUT #{nid}",
+                body="Auto-dismisses after 5 seconds.",
+                timeout_after=5000,
+                icon="ic_notification",
+            )
+            set_log(f"OK timeout #{nid} — disappears in 5s")
+        except Exception as ex:
+            set_log(f"FAIL timeout: {type(ex).__name__}: {ex}")
+
+    # -- 19. periodic notification (every minute) --
+    async def send_periodic(e):
+        try:
+            nid = next_id()
+            await notifications.periodically_show(
+                notification_id=nid,
+                title=f"PERIODIC #{nid}",
+                body="Repeats every minute.",
+                repeat_interval="every_minute",
+                icon="ic_notification",
+            )
+            set_log(f"OK periodic #{nid} — repeats every minute")
+        except Exception as ex:
+            set_log(f"FAIL periodic: {type(ex).__name__}: {ex}")
+
+    # -- 20. periodic with custom duration (90s) --
+    async def send_periodic_duration(e):
+        try:
+            nid = next_id()
+            await notifications.periodically_show_with_duration(
+                notification_id=nid,
+                title=f"PERIODIC DURATION #{nid}",
+                body="Repeats every 90 seconds.",
+                duration_seconds=90,
+                icon="ic_notification",
+            )
+            set_log(f"OK periodic duration #{nid} — repeats every 90s")
+        except Exception as ex:
+            set_log(f"FAIL periodic duration: {type(ex).__name__}: {ex}")
+
+    # -- 21. get active notifications --
+    async def query_active(e):
+        try:
+            active = await notifications.get_active_notifications()
+            set_log(f"Active ({len(active)}):\n{json.dumps(active, indent=2)}")
+        except Exception as ex:
+            set_log(f"FAIL get active: {type(ex).__name__}: {ex}")
+
+    # -- 22. get pending notifications --
+    async def query_pending(e):
+        try:
+            pending = await notifications.get_pending_notifications()
+            set_log(f"Pending ({len(pending)}):\n{json.dumps(pending, indent=2)}")
+        except Exception as ex:
+            set_log(f"FAIL get pending: {type(ex).__name__}: {ex}")
+
     async def cancel_all(e):
         await notifications.cancel_all()
         set_log("all cancelled")
@@ -220,6 +492,67 @@ def main(page: ft.Page):
                 ft.Divider(height=1),
                 ft.Button(content="7. Silent", on_click=send_silent),
                 hint("no sound, no vibration."),
+                ft.Divider(height=1),
+                ft.Button(content="8. Big text style", on_click=send_big_text),
+                hint("swipe DOWN to expand — shows full paragraph.\n"
+                     "collapsed view shows truncated body."),
+                ft.Divider(height=1),
+                ft.Button(content="9. Progress bar (65%)", on_click=send_progress),
+                hint("shows determinate progress bar at 65%.\n"
+                     "notification is ongoing (can't swipe away)."),
+                ft.Divider(height=1),
+                ft.Button(content="10. Indeterminate progress", on_click=send_indeterminate),
+                hint("shows spinning/sliding progress bar.\n"
+                     "notification is ongoing (can't swipe away)."),
+                ft.Divider(height=1),
+                ft.Button(content="11. Ongoing (sticky)", on_click=send_ongoing),
+                hint("can't be swiped away. use 'cancel all' to remove.\n"
+                     "Samsung OneUI may allow swipe — that's a known OEM quirk."),
+                ft.Divider(height=1),
+                ft.Button(content="12. Action buttons", on_click=send_actions),
+                hint("shows Approve / Deny buttons.\n"
+                     "tap one — check log for tap event data."),
+                ft.Divider(height=1),
+                ft.Button(content="13. Sub text", on_click=send_sub_text),
+                hint("look for 'HELLO-SUB-TEXT' in notification header\n"
+                     "next to app name, or below body when expanded."),
+                ft.Divider(height=1),
+                ft.Button(content="14. Secret (lock screen)", on_click=send_visibility),
+                hint("should NOT appear on lock screen.\n"
+                     "Samsung: Settings > Lock screen > Notifications\n"
+                     "must be set to 'hide content' or 'icons only'."),
+                ft.Divider(height=1),
+                ft.Button(content="15. Only alert once", on_click=send_only_alert_once),
+                hint("first show plays sound, then 1s later updates silently.\n"
+                     "you should only hear ONE alert sound."),
+                ft.Divider(height=1),
+                ft.Button(content="16. Custom vibration", on_click=send_vibration),
+                hint("3 short buzzes with long pauses, NO sound.\n"
+                     "Samsung: check Settings > Sounds > Vibration intensity."),
+                ft.Divider(height=1),
+                ft.Button(content="17. Scheduled (10s delay)", on_click=send_scheduled),
+                hint("fires in ~10 seconds. close app to verify\n"
+                     "it still fires even when app is not in foreground."),
+                ft.Divider(height=1),
+                ft.Button(content="18. Timeout (5s auto-dismiss)", on_click=send_timeout),
+                hint("notification disappears after 5 seconds.\n"
+                     "watch the shade — it should vanish on its own."),
+                ft.Divider(height=1),
+                ft.Button(content="19. Periodic (every minute)", on_click=send_periodic),
+                hint("repeats every minute. use 'cancel all' to stop.\n"
+                     "Android may batch/delay in doze mode."),
+                ft.Divider(height=1),
+                ft.Button(content="20. Periodic duration (90s)", on_click=send_periodic_duration),
+                hint("repeats every 90 seconds via custom duration.\n"
+                     "use 'cancel all' to stop."),
+                ft.Divider(height=1),
+                ft.Button(content="21. Get active notifications", on_click=query_active),
+                hint("shows currently displayed notifications.\n"
+                     "send some first, then tap this."),
+                ft.Divider(height=1),
+                ft.Button(content="22. Get pending notifications", on_click=query_pending),
+                hint("shows scheduled/periodic notifications.\n"
+                     "schedule or set periodic first, then tap this."),
                 ft.Divider(),
                 ft.Button(content="Cancel all", on_click=cancel_all),
             ],

@@ -96,6 +96,16 @@ def step_patch_app_zip():
     tmp_zip.replace(APP_ZIP)
     print("  app.zip patched successfully")
 
+    # also patch site-packages arch dirs so SERIOUS_PYTHON_SITE_PACKAGES doesn't override with stale copies
+    site_packages = ROOT / "build" / "site-packages"
+    if site_packages.exists():
+        for arch_pkg_dir in site_packages.glob("*/flet_android_notifications"):
+            if arch_pkg_dir.is_dir():
+                for py_file in py_files:
+                    dest = arch_pkg_dir / py_file.name
+                    shutil.copy2(py_file, dest)
+                print(f"  patched site-packages: {arch_pkg_dir.parent.name}")
+
 
 def step_update_hash():
     """Step 3: regenerate app.zip.hash."""
