@@ -451,6 +451,28 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL get pending: {type(ex).__name__}: {ex}")
 
+    # -- 23. foreground service --
+    async def send_foreground(e):
+        try:
+            nid = next_id()
+            await notifications.start_foreground_service(
+                notification_id=nid,
+                title=f"FOREGROUND #{nid}",
+                body="Foreground service running with special_use type.",
+                foreground_service_types=["special_use"],
+                icon="ic_notification",
+            )
+            set_log(f"OK foreground #{nid} - use stop button to end")
+        except Exception as ex:
+            set_log(f"FAIL foreground: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+
+    async def stop_foreground(e):
+        try:
+            await notifications.stop_foreground_service()
+            set_log("foreground service stopped")
+        except Exception as ex:
+            set_log(f"FAIL stop foreground: {type(ex).__name__}: {ex}")
+
     async def cancel_all(e):
         await notifications.cancel_all()
         set_log("all cancelled")
@@ -553,6 +575,11 @@ def main(page: ft.Page):
                 ft.Button(content="22. Get pending notifications", on_click=query_pending),
                 hint("shows scheduled/periodic notifications.\n"
                      "schedule or set periodic first, then tap this."),
+                ft.Divider(height=1),
+                ft.Button(content="23. Foreground service (start)", on_click=send_foreground),
+                hint("starts foreground service with special_use type.\n"
+                     "persistent notification, can't be swiped away."),
+                ft.Button(content="23. Foreground service (stop)", on_click=stop_foreground),
                 ft.Divider(),
                 ft.Button(content="Cancel all", on_click=cancel_all),
             ],

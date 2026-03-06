@@ -255,19 +255,19 @@ class NotificationsService extends FletService {
       List<dynamic>? values) {
     if (values == null || values.isEmpty) return null;
     final map = <String, AndroidServiceForegroundType>{
-      "data_sync": AndroidServiceForegroundType.dataSync,
-      "media_playback": AndroidServiceForegroundType.mediaPlayback,
-      "phone_call": AndroidServiceForegroundType.phoneCall,
-      "location": AndroidServiceForegroundType.location,
-      "connected_device": AndroidServiceForegroundType.connectedDevice,
-      "media_projection": AndroidServiceForegroundType.mediaProjection,
-      "camera": AndroidServiceForegroundType.camera,
-      "microphone": AndroidServiceForegroundType.microphone,
-      "health": AndroidServiceForegroundType.health,
-      "remote_messaging": AndroidServiceForegroundType.remoteMessaging,
-      "system_exempted": AndroidServiceForegroundType.systemExempted,
-      "short_service": AndroidServiceForegroundType.shortService,
-      "special_use": AndroidServiceForegroundType.specialUse,
+      "data_sync": AndroidServiceForegroundType.foregroundServiceTypeDataSync,
+      "media_playback": AndroidServiceForegroundType.foregroundServiceTypeMediaPlayback,
+      "phone_call": AndroidServiceForegroundType.foregroundServiceTypePhoneCall,
+      "location": AndroidServiceForegroundType.foregroundServiceTypeLocation,
+      "connected_device": AndroidServiceForegroundType.foregroundServiceTypeConnectedDevice,
+      "media_projection": AndroidServiceForegroundType.foregroundServiceTypeMediaProjection,
+      "camera": AndroidServiceForegroundType.foregroundServiceTypeCamera,
+      "microphone": AndroidServiceForegroundType.foregroundServiceTypeMicrophone,
+      "health": AndroidServiceForegroundType.foregroundServiceTypeHealth,
+      "remote_messaging": AndroidServiceForegroundType.foregroundServiceTypeRemoteMessaging,
+      "system_exempted": AndroidServiceForegroundType.foregroundServiceTypeSystemExempted,
+      "short_service": AndroidServiceForegroundType.foregroundServiceTypeShortService,
+      "special_use": AndroidServiceForegroundType.foregroundServiceTypeSpecialUse,
     };
     return values
         .map((v) => map[v as String])
@@ -617,9 +617,9 @@ class NotificationsService extends FletService {
           final android = _plugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
           await android?.startForegroundService(
-            a["id"] as int,
-            a["title"] as String,
-            a["body"] as String,
+            id: a["id"] as int,
+            title: a["title"] as String,
+            body: a["body"] as String,
             notificationDetails: details.android,
             payload: a["payload"] as String,
             startType: _parseServiceStartType(a["start_type"] as String),
