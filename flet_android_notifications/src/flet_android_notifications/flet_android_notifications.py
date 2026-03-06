@@ -115,6 +115,16 @@ NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
 
 _VALID_VISIBILITIES = {"public", "private", "secret"}
 
+_VALID_START_TYPES = {
+    "start_sticky", "start_not_sticky", "start_sticky_compatibility", "start_redeliver_intent",
+}
+
+_VALID_FOREGROUND_SERVICE_TYPES = {
+    "data_sync", "media_playback", "phone_call", "location", "connected_device",
+    "media_projection", "camera", "microphone", "health", "remote_messaging",
+    "system_exempted", "short_service", "special_use",
+}
+
 
 def _validate_visibility(visibility: str) -> None:
     """Validate visibility is one of public, private, secret."""
@@ -649,6 +659,142 @@ class FletAndroidNotifications(ft.Service):
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
             },
+        )
+        return self._check_error(result)
+
+    async def start_foreground_service(
+        self,
+        notification_id: int,
+        title: str,
+        body: str,
+        *,
+        payload: str = "",
+        start_type: str = "start_sticky",
+        foreground_service_types: Optional[list[str]] = None,
+        actions: Optional[list[dict]] = None,
+        channel_id: str = "flet_notifications",
+        channel_name: str = "Flet Notifications",
+        channel_description: str = "Notifications from Flet app",
+        importance: str = "high",
+        play_sound: bool = True,
+        enable_vibration: bool = True,
+        style: Optional[NotificationStyle] = None,
+        show_progress: bool = False,
+        max_progress: int = 0,
+        progress: int = 0,
+        indeterminate: bool = False,
+        group_key: Optional[str] = None,
+        set_as_group_summary: bool = False,
+        group_alert_behavior: str = "all",
+        icon: Optional[str] = None,
+        large_icon: Optional[str] = None,
+        large_icon_type: str = "drawable_resource",
+        color: Optional[str] = None,
+        colorized: bool = False,
+        sound: Optional[str] = None,
+        ongoing: bool = False,
+        auto_cancel: bool = True,
+        silent: bool = False,
+        only_alert_once: bool = False,
+        visibility: Optional[str] = None,
+        sub_text: Optional[str] = None,
+        channel_bypass_dnd: bool = False,
+        vibration_pattern: Optional[list[int]] = None,
+        timeout_after: Optional[int] = None,
+    ):
+        """Start an Android foreground service with a persistent notification.
+
+        Foreground services keep the app alive for long-running tasks (music,
+        GPS, uploads). The notification cannot be swiped away and is not
+        removed by cancel() — use stop_foreground_service() instead.
+
+        Args:
+            notification_id: Unique integer ID. Must not be 0 (Android constraint).
+            title: Notification title.
+            body: Notification body text.
+            payload: Arbitrary string returned in on_notification_tap event.
+            start_type: Service start type. One of "start_sticky" (default),
+                "start_not_sticky", "start_sticky_compatibility",
+                "start_redeliver_intent".
+            foreground_service_types: List of foreground service types, e.g.
+                ["special_use"]. Values: data_sync, media_playback, phone_call,
+                location, connected_device, media_projection, camera, microphone,
+                health, remote_messaging, system_exempted, short_service,
+                special_use.
+            (All other params are the same as show_notification.)
+
+        Raises:
+            ValueError: If notification_id is 0, or start_type/foreground_service_types invalid.
+            NotificationError: If the native side reports an error.
+        """
+        if notification_id == 0:
+            raise ValueError("notification_id must not be 0 for foreground services (Android constraint)")
+        if start_type not in _VALID_START_TYPES:
+            raise ValueError(
+                f"start_type must be one of {sorted(_VALID_START_TYPES)}, got: {start_type!r}"
+            )
+        if foreground_service_types is not None:
+            for fst in foreground_service_types:
+                if fst not in _VALID_FOREGROUND_SERVICE_TYPES:
+                    raise ValueError(
+                        f"foreground_service_type must be one of "
+                        f"{sorted(_VALID_FOREGROUND_SERVICE_TYPES)}, got: {fst!r}"
+                    )
+        if color is not None:
+            _validate_color_hex(color)
+        if visibility is not None:
+            _validate_visibility(visibility)
+        result = await self._invoke_method(
+            method_name="start_foreground_service",
+            arguments={
+                "id": notification_id,
+                "title": title,
+                "body": body,
+                "payload": payload,
+                "start_type": start_type,
+                "foreground_service_types": foreground_service_types,
+                "actions": actions or [],
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "channel_description": channel_description,
+                "importance": importance,
+                "play_sound": play_sound,
+                "enable_vibration": enable_vibration,
+                "style": style.to_dict() if style else None,
+                "show_progress": show_progress,
+                "max_progress": max_progress,
+                "progress": progress,
+                "indeterminate": indeterminate,
+                "group_key": group_key,
+                "set_as_group_summary": set_as_group_summary,
+                "group_alert_behavior": group_alert_behavior,
+                "icon": icon,
+                "large_icon": large_icon,
+                "large_icon_type": large_icon_type,
+                "color": color,
+                "colorized": colorized,
+                "sound": sound,
+                "ongoing": ongoing,
+                "auto_cancel": auto_cancel,
+                "silent": silent,
+                "only_alert_once": only_alert_once,
+                "visibility": visibility,
+                "sub_text": sub_text,
+                "channel_bypass_dnd": channel_bypass_dnd,
+                "vibration_pattern": vibration_pattern,
+                "timeout_after": timeout_after,
+            },
+        )
+        return self._check_error(result)
+
+    async def stop_foreground_service(self):
+        """Stop the Android foreground service and remove its notification.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="stop_foreground_service",
         )
         return self._check_error(result)
 

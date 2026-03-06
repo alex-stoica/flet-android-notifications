@@ -236,6 +236,45 @@ class NotificationsService extends FletService {
     }
   }
 
+  AndroidServiceStartType _parseServiceStartType(String value) {
+    switch (value) {
+      case "start_sticky":
+        return AndroidServiceStartType.startSticky;
+      case "start_not_sticky":
+        return AndroidServiceStartType.startNotSticky;
+      case "start_sticky_compatibility":
+        return AndroidServiceStartType.startStickyCompatibility;
+      case "start_redeliver_intent":
+        return AndroidServiceStartType.startRedeliverIntent;
+      default:
+        return AndroidServiceStartType.startSticky;
+    }
+  }
+
+  Set<AndroidServiceForegroundType>? _parseForegroundServiceTypes(
+      List<dynamic>? values) {
+    if (values == null || values.isEmpty) return null;
+    final map = <String, AndroidServiceForegroundType>{
+      "data_sync": AndroidServiceForegroundType.dataSync,
+      "media_playback": AndroidServiceForegroundType.mediaPlayback,
+      "phone_call": AndroidServiceForegroundType.phoneCall,
+      "location": AndroidServiceForegroundType.location,
+      "connected_device": AndroidServiceForegroundType.connectedDevice,
+      "media_projection": AndroidServiceForegroundType.mediaProjection,
+      "camera": AndroidServiceForegroundType.camera,
+      "microphone": AndroidServiceForegroundType.microphone,
+      "health": AndroidServiceForegroundType.health,
+      "remote_messaging": AndroidServiceForegroundType.remoteMessaging,
+      "system_exempted": AndroidServiceForegroundType.systemExempted,
+      "short_service": AndroidServiceForegroundType.shortService,
+      "special_use": AndroidServiceForegroundType.specialUse,
+    };
+    return values
+        .map((v) => map[v as String])
+        .whereType<AndroidServiceForegroundType>()
+        .toSet();
+  }
+
   NotificationDetails _buildNotificationDetails({
     required String channelId,
     required String channelName,
@@ -529,6 +568,70 @@ class NotificationsService extends FletService {
             androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
             payload: a["payload"] as String,
           );
+          return "ok";
+        case "start_foreground_service":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          final importance = _parseImportance(a["importance"] as String);
+          final rawStyle = a["style"];
+          final styleInfo = _parseStyleInformation(
+              rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
+          final details = _buildNotificationDetails(
+            channelId: a["channel_id"] as String,
+            channelName: a["channel_name"] as String,
+            channelDescription: a["channel_description"] as String,
+            importance: importance,
+            priority: _priorityFromImportance(importance),
+            playSound: a["play_sound"] as bool,
+            enableVibration: a["enable_vibration"] as bool,
+            actions: _parseActions(a["actions"] as List<dynamic>),
+            styleInformation: styleInfo,
+            showProgress: a["show_progress"] as bool? ?? false,
+            maxProgress: a["max_progress"] as int? ?? 0,
+            progress: a["progress"] as int? ?? 0,
+            indeterminate: a["indeterminate"] as bool? ?? false,
+            groupKey: a["group_key"] as String?,
+            setAsGroupSummary: a["set_as_group_summary"] as bool? ?? false,
+            groupAlertBehavior: _parseGroupAlertBehavior(
+                a["group_alert_behavior"] as String? ?? "all"),
+            icon: a["icon"] as String?,
+            largeIcon: _parseLargeIcon(
+                a["large_icon"] as String?,
+                a["large_icon_type"] as String? ?? "drawable_resource"),
+            color: _parseColor(a["color"] as String?),
+            colorized: a["colorized"] as bool? ?? false,
+            sound: a["sound"] as String?,
+            ongoing: a["ongoing"] as bool? ?? false,
+            autoCancel: a["auto_cancel"] as bool? ?? true,
+            silent: a["silent"] as bool? ?? false,
+            onlyAlertOnce: a["only_alert_once"] as bool? ?? false,
+            visibility: _parseVisibility(a["visibility"] as String?),
+            subText: a["sub_text"] as String?,
+            channelBypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            vibrationPattern: a["vibration_pattern"] != null
+                ? Int64List.fromList(
+                    (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                : null,
+            timeoutAfter: a["timeout_after"] as int?,
+          );
+          final android = _plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+          await android?.startForegroundService(
+            a["id"] as int,
+            a["title"] as String,
+            a["body"] as String,
+            notificationDetails: details.android,
+            payload: a["payload"] as String,
+            startType: _parseServiceStartType(a["start_type"] as String),
+            foregroundServiceTypes: _parseForegroundServiceTypes(
+                a["foreground_service_types"] as List<dynamic>?),
+          );
+          return "ok";
+        case "stop_foreground_service":
+          await _ensureInitialized();
+          final android = _plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+          await android?.stopForegroundService();
           return "ok";
         case "get_active_notifications":
           await _ensureInitialized();

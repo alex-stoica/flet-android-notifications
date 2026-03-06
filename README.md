@@ -51,7 +51,7 @@ ft.run(main)
 
 Instantiate `FletAndroidNotifications` once. Don't add it to `page.overlay` or `page.controls` — it's a service, not a visual control.
 
-See [`examples/`](examples/) for more: [simple](examples/simple.py), [action buttons](examples/action_buttons.py), [scheduled](examples/scheduled.py), [styles](examples/notification_styles.py), [periodic](examples/periodic.py), [timeout](examples/timeout.py), [query](examples/query_notifications.py).
+See [`examples/`](examples/) for more: [simple](examples/simple.py), [action buttons](examples/action_buttons.py), [scheduled](examples/scheduled.py), [styles](examples/notification_styles.py), [periodic](examples/periodic.py), [timeout](examples/timeout.py), [query](examples/query_notifications.py), [foreground service](examples/foreground_service.py).
 
 ## API overview
 
@@ -63,6 +63,8 @@ See [`examples/`](examples/) for more: [simple](examples/simple.py), [action but
 | `schedule_notification(id, title, body, scheduled_time, ...)` | fire at a future time via AlarmManager |
 | `periodically_show(id, title, body, repeat_interval, ...)` | repeat every minute / hour / day / week |
 | `periodically_show_with_duration(id, title, body, duration_seconds, ...)` | repeat at a custom interval |
+| `start_foreground_service(id, title, body, ...)` | start a foreground service with persistent notification |
+| `stop_foreground_service()` | stop the foreground service and remove its notification |
 | `cancel(notification_id)` | cancel one notification |
 | `cancel_all()` | cancel all notifications |
 
@@ -197,6 +199,55 @@ These only apply to `schedule_notification`:
 | `"alarm_clock"` | yes | yes |
 
 ---
+
+## Foreground service
+
+For persistent background tasks (music, GPS tracking, uploads) that require a visible notification:
+
+```python
+await notifications.start_foreground_service(
+    notification_id=1,  # must not be 0
+    title="Uploading",
+    body="3 files remaining...",
+    foreground_service_types=["special_use"],
+    ongoing=True,
+)
+
+# when done:
+await notifications.stop_foreground_service()
+```
+
+**Parameters specific to foreground service:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `start_type` | `str` | `"start_sticky"` | `start_sticky`, `start_not_sticky`, `start_sticky_compatibility`, `start_redeliver_intent` |
+| `foreground_service_types` | `list[str]\|None` | `None` | e.g. `["special_use"]`, `["location"]`, `["media_playback"]` |
+
+All other notification parameters (channel, appearance, behavior, etc.) are the same as `show_notification`.
+
+**Important:**
+- `notification_id` must not be 0 (Android constraint)
+- The notification is **not** removed by `cancel()` or `cancel_all()` — use `stop_foreground_service()`
+- Requires `FOREGROUND_SERVICE` permission plus a type-specific permission (e.g. `FOREGROUND_SERVICE_SPECIAL_USE`)
+
+**AndroidManifest.xml** — add inside `<application>`:
+
+```xml
+<service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+    android:exported="false"
+    android:foregroundServiceType="specialUse" />
+```
+
+Adjust `foregroundServiceType` to match your use case (e.g. `location`, `mediaPlayback`).
+
+**pyproject.toml permissions:**
+
+```toml
+[tool.flet.android.permission]
+"android.permission.FOREGROUND_SERVICE" = true
+"android.permission.FOREGROUND_SERVICE_SPECIAL_USE" = true
+```
 
 ## Styles
 

@@ -1,6 +1,6 @@
 # Examples
 
-Nine standalone examples. Copy any to your project as `main.py` and build with `flet build apk -v`.
+Ten standalone examples. Copy any to your project as `main.py` and build with `flet build apk -v`.
 
 | Example | What it demonstrates |
 |---|---|
@@ -13,6 +13,7 @@ Nine standalone examples. Copy any to your project as `main.py` and build with `
 | [`periodic.py`](periodic.py) | repeating notifications (every minute, custom 90s interval) |
 | [`timeout.py`](timeout.py) | auto-dismissing notifications (5s, 10s, no timeout) |
 | [`query_notifications.py`](query_notifications.py) | inspect active (displayed) and pending (scheduled) notifications |
+| [`foreground_service.py`](foreground_service.py) | start/stop a foreground service with persistent notification |
 
 ## What to look for
 
@@ -33,6 +34,8 @@ Nine standalone examples. Copy any to your project as `main.py` and build with `
 **timeout** — 5s/10s notifications vanish from the shade on their own. Compare with "No timeout" which stays.
 
 **query** — send some notifications, then tap "Get active" to see what's displayed. Schedule some, then "Get pending" to see what's queued. Results shown as JSON in the app.
+
+**foreground_service** — "Start" creates a persistent notification that can't be swiped away. "Stop" removes it. Requires FOREGROUND_SERVICE permission.
 
 ## Building
 

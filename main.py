@@ -296,7 +296,7 @@ def main(page: ft.Page):
             await notifications.show_notification(
                 notification_id=nid,
                 title=f"SUB TEXT #{nid}",
-                body="Check header line: AppName \u2022 sub_text \u2022 time.",
+                body="Look for 'HELLO-SUB-TEXT' in notification header.",
                 sub_text="HELLO-SUB-TEXT",
                 channel_id="subtext_ch",
                 channel_name="Sub Text",
