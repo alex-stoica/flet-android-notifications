@@ -126,6 +126,7 @@ These work on all four methods above.
 | `actions` | `list[dict]` | `None` | buttons: `[{"id": "...", "title": "..."}]` |
 | `importance` | `str` | `"high"` | `none`, `min`, `low`, `default`, `high`, `max` |
 | `timeout_after` | `int\|None` | `None` | auto-dismiss after N milliseconds |
+| `category` | `str\|None` | `None` | notification type hint for DND filtering |
 
 **Channel:**
 

@@ -29,7 +29,12 @@ class NotificationsService extends FletService {
   }
 
   Future<bool> _ensureInitialized() async {
-    if (_initCompleter != null) return _initCompleter!.future;
+    if (_initCompleter != null) {
+      final result = await _initCompleter!.future;
+      if (result) return true;
+      // Previous init failed — reset and retry
+      _initCompleter = null;
+    }
     _initCompleter = Completer<bool>();
 
     try {
@@ -47,7 +52,7 @@ class NotificationsService extends FletService {
           // on show, but action button presses are always intentional.
           if (!hasAction &&
               _lastShowTime != null &&
-              DateTime.now().difference(_lastShowTime!).inSeconds < 3) {
+              DateTime.now().difference(_lastShowTime!).inMilliseconds < 1000) {
             return;
           }
           control.triggerEvent("notification_tap", jsonEncode({
@@ -79,7 +84,7 @@ class NotificationsService extends FletService {
       case "max":
         return Importance.max;
       default:
-        return Importance.high;
+        throw ArgumentError('invalid importance: $value');
     }
   }
 
@@ -114,7 +119,7 @@ class NotificationsService extends FletService {
       case "inexact_allow_while_idle":
         return AndroidScheduleMode.inexactAllowWhileIdle;
       default:
-        return AndroidScheduleMode.inexactAllowWhileIdle;
+        throw ArgumentError('invalid schedule_mode: $value');
     }
   }
 
@@ -130,18 +135,20 @@ class NotificationsService extends FletService {
       case "date_and_time":
         return DateTimeComponents.dateAndTime;
       default:
-        return null;
+        throw ArgumentError('invalid match_date_time_components: $value');
     }
   }
 
   GroupAlertBehavior _parseGroupAlertBehavior(String value) {
     switch (value) {
+      case "all":
+        return GroupAlertBehavior.all;
       case "summary":
         return GroupAlertBehavior.summary;
       case "children":
         return GroupAlertBehavior.children;
       default:
-        return GroupAlertBehavior.all;
+        throw ArgumentError('invalid group_alert_behavior: $value');
     }
   }
 
@@ -171,6 +178,48 @@ class NotificationsService extends FletService {
         return NotificationVisibility.secret;
       default:
         return null;
+    }
+  }
+
+  AndroidNotificationCategory? _parseCategory(String? value) {
+    if (value == null) return null;
+    switch (value) {
+      case "alarm":
+        return AndroidNotificationCategory.alarm;
+      case "call":
+        return AndroidNotificationCategory.call;
+      case "email":
+        return AndroidNotificationCategory.email;
+      case "error":
+        return AndroidNotificationCategory.error;
+      case "event":
+        return AndroidNotificationCategory.event;
+      case "message":
+        return AndroidNotificationCategory.message;
+      case "navigation":
+        return AndroidNotificationCategory.navigation;
+      case "progress":
+        return AndroidNotificationCategory.progress;
+      case "promo":
+        return AndroidNotificationCategory.promo;
+      case "recommendation":
+        return AndroidNotificationCategory.recommendation;
+      case "reminder":
+        return AndroidNotificationCategory.reminder;
+      case "service":
+        return AndroidNotificationCategory.service;
+      case "social":
+        return AndroidNotificationCategory.social;
+      case "status":
+        return AndroidNotificationCategory.status;
+      case "stopwatch":
+        return AndroidNotificationCategory.stopwatch;
+      case "transport":
+        return AndroidNotificationCategory.transport;
+      case "workout":
+        return AndroidNotificationCategory.workout;
+      default:
+        throw ArgumentError('invalid category: $value');
     }
   }
 
@@ -232,7 +281,7 @@ class NotificationsService extends FletService {
       case "weekly":
         return RepeatInterval.weekly;
       default:
-        return RepeatInterval.daily;
+        throw ArgumentError('invalid repeat_interval: $value');
     }
   }
 
@@ -247,7 +296,7 @@ class NotificationsService extends FletService {
       case "start_redeliver_intent":
         return AndroidServiceStartType.startRedeliverIntent;
       default:
-        return AndroidServiceStartType.startSticky;
+        throw ArgumentError('invalid start_type: $value');
     }
   }
 
@@ -269,10 +318,15 @@ class NotificationsService extends FletService {
       "short_service": AndroidServiceForegroundType.foregroundServiceTypeShortService,
       "special_use": AndroidServiceForegroundType.foregroundServiceTypeSpecialUse,
     };
-    return values
-        .map((v) => map[v as String])
-        .whereType<AndroidServiceForegroundType>()
-        .toSet();
+    final result = <AndroidServiceForegroundType>{};
+    for (final v in values) {
+      final type = map[v as String];
+      if (type == null) {
+        throw ArgumentError('invalid foreground_service_type: $v');
+      }
+      result.add(type);
+    }
+    return result;
   }
 
   NotificationDetails _buildNotificationDetails({
@@ -306,6 +360,7 @@ class NotificationsService extends FletService {
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
     int? timeoutAfter,
+    AndroidNotificationCategory? category,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -338,6 +393,7 @@ class NotificationsService extends FletService {
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
+      category: category,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -403,6 +459,7 @@ class NotificationsService extends FletService {
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
+            category: _parseCategory(a["category"] as String?),
           );
           return "ok";
         case "schedule_notification":
@@ -457,6 +514,7 @@ class NotificationsService extends FletService {
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
+            category: _parseCategory(a["category"] as String?),
           );
           return "ok";
         case "periodically_show":
@@ -503,6 +561,7 @@ class NotificationsService extends FletService {
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
+            category: _parseCategory(a["category"] as String?),
           );
           await _plugin.periodicallyShow(
             id: a["id"] as int,
@@ -558,6 +617,7 @@ class NotificationsService extends FletService {
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
+            category: _parseCategory(a["category"] as String?),
           );
           await _plugin.periodicallyShowWithDuration(
             id: a["id"] as int,
@@ -613,10 +673,12 @@ class NotificationsService extends FletService {
                     (a["vibration_pattern"] as List<dynamic>).cast<int>())
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
+            category: _parseCategory(a["category"] as String?),
           );
           final android = _plugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-          await android?.startForegroundService(
+          if (android == null) throw Exception('Android platform not available');
+          await android.startForegroundService(
             id: a["id"] as int,
             title: a["title"] as String,
             body: a["body"] as String,
@@ -631,7 +693,8 @@ class NotificationsService extends FletService {
           await _ensureInitialized();
           final android = _plugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-          await android?.stopForegroundService();
+          if (android == null) throw Exception('Android platform not available');
+          await android.stopForegroundService();
           return "ok";
         case "get_active_notifications":
           await _ensureInitialized();
@@ -655,10 +718,12 @@ class NotificationsService extends FletService {
           }).toList();
           return jsonEncode(list);
         case "cancel":
+          await _ensureInitialized();
           final a = Map<String, dynamic>.from(args as Map);
           await _plugin.cancel(id: a["id"] as int);
           return "ok";
         case "cancel_all":
+          await _ensureInitialized();
           await _plugin.cancelAll();
           return "ok";
         case "request_permissions":
@@ -670,7 +735,7 @@ class NotificationsService extends FletService {
       }
       return null;
     } catch (e) {
-      return "error:$e";
+      return "error:${e.runtimeType}: $e";
     }
   }
 
@@ -709,6 +774,7 @@ class NotificationsService extends FletService {
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
     int? timeoutAfter,
+    AndroidNotificationCategory? category,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -747,6 +813,7 @@ class NotificationsService extends FletService {
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
+      category: category,
     );
 
     await _plugin.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
@@ -790,6 +857,7 @@ class NotificationsService extends FletService {
     bool channelBypassDnd = false,
     Int64List? vibrationPattern,
     int? timeoutAfter,
+    AndroidNotificationCategory? category,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -832,6 +900,7 @@ class NotificationsService extends FletService {
       channelBypassDnd: channelBypassDnd,
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
+      category: category,
     );
 
     await _plugin.zonedSchedule(

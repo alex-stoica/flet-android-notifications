@@ -115,8 +115,28 @@ NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
 
 _VALID_VISIBILITIES = {"public", "private", "secret"}
 
+_VALID_IMPORTANCES = {"none", "min", "low", "default", "high", "max"}
+
+_VALID_GROUP_ALERT_BEHAVIORS = {"all", "summary", "children"}
+
+_VALID_SCHEDULE_MODES = {
+    "alarm_clock", "exact", "exact_allow_while_idle", "inexact", "inexact_allow_while_idle",
+}
+
+_VALID_REPEAT_INTERVALS = {"every_minute", "hourly", "daily", "weekly"}
+
+_VALID_MATCH_COMPONENTS = {"time", "day_of_week_and_time", "day_of_month_and_time", "date_and_time"}
+
+_VALID_LARGE_ICON_TYPES = {"drawable_resource", "file_path"}
+
 _VALID_START_TYPES = {
     "start_sticky", "start_not_sticky", "start_sticky_compatibility", "start_redeliver_intent",
+}
+
+_VALID_CATEGORIES = {
+    "alarm", "call", "email", "error", "event", "message", "navigation",
+    "progress", "promo", "recommendation", "reminder", "service", "social",
+    "status", "stopwatch", "transport", "workout",
 }
 
 _VALID_FOREGROUND_SERVICE_TYPES = {
@@ -126,12 +146,14 @@ _VALID_FOREGROUND_SERVICE_TYPES = {
 }
 
 
+def _validate_enum(value: str, valid: set, name: str) -> None:
+    if value not in valid:
+        raise ValueError(f"{name} must be one of {sorted(valid)}, got: {value!r}")
+
+
 def _validate_visibility(visibility: str) -> None:
     """Validate visibility is one of public, private, secret."""
-    if visibility not in _VALID_VISIBILITIES:
-        raise ValueError(
-            f"visibility must be one of {sorted(_VALID_VISIBILITIES)}, got: {visibility!r}"
-        )
+    _validate_enum(visibility, _VALID_VISIBILITIES, "visibility")
 
 
 def _validate_color_hex(color: str) -> None:
@@ -194,6 +216,7 @@ class FletAndroidNotifications(ft.Service):
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
+        category: Optional[str] = None,
     ):
         """Show an Android notification.
 
@@ -257,10 +280,16 @@ class FletAndroidNotifications(ft.Service):
         Raises:
             NotificationError: If the native side reports an error.
         """
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
+        if large_icon is not None:
+            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
             _validate_color_hex(color)
         if visibility is not None:
             _validate_visibility(visibility)
+        if category is not None:
+            _validate_enum(category, _VALID_CATEGORIES, "category")
         result = await self._invoke_method(
             method_name="show_notification",
             arguments={
@@ -298,6 +327,7 @@ class FletAndroidNotifications(ft.Service):
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
+                "category": category,
             },
         )
         return self._check_error(result)
@@ -342,6 +372,7 @@ class FletAndroidNotifications(ft.Service):
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
+        category: Optional[str] = None,
     ):
         """Schedule an Android notification for a future time.
 
@@ -415,10 +446,19 @@ class FletAndroidNotifications(ft.Service):
         Raises:
             NotificationError: If the native side reports an error.
         """
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
+        _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
+        if match_date_time_components is not None:
+            _validate_enum(match_date_time_components, _VALID_MATCH_COMPONENTS, "match_date_time_components")
+        if large_icon is not None:
+            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
             _validate_color_hex(color)
         if visibility is not None:
             _validate_visibility(visibility)
+        if category is not None:
+            _validate_enum(category, _VALID_CATEGORIES, "category")
         epoch_ms = int(scheduled_time.timestamp() * 1000)
         result = await self._invoke_method(
             method_name="schedule_notification",
@@ -460,6 +500,7 @@ class FletAndroidNotifications(ft.Service):
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
+                "category": category,
             },
         )
         return self._check_error(result)
@@ -502,6 +543,7 @@ class FletAndroidNotifications(ft.Service):
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
+        category: Optional[str] = None,
     ):
         """Show a notification that repeats at a fixed interval.
 
@@ -517,10 +559,17 @@ class FletAndroidNotifications(ft.Service):
         Raises:
             NotificationError: If the native side reports an error.
         """
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
+        _validate_enum(repeat_interval, _VALID_REPEAT_INTERVALS, "repeat_interval")
+        if large_icon is not None:
+            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
             _validate_color_hex(color)
         if visibility is not None:
             _validate_visibility(visibility)
+        if category is not None:
+            _validate_enum(category, _VALID_CATEGORIES, "category")
         result = await self._invoke_method(
             method_name="periodically_show",
             arguments={
@@ -559,6 +608,7 @@ class FletAndroidNotifications(ft.Service):
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
+                "category": category,
             },
         )
         return self._check_error(result)
@@ -601,6 +651,7 @@ class FletAndroidNotifications(ft.Service):
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
+        category: Optional[str] = None,
     ):
         """Show a notification that repeats at a custom duration.
 
@@ -616,10 +667,16 @@ class FletAndroidNotifications(ft.Service):
         Raises:
             NotificationError: If the native side reports an error.
         """
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
+        if large_icon is not None:
+            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
             _validate_color_hex(color)
         if visibility is not None:
             _validate_visibility(visibility)
+        if category is not None:
+            _validate_enum(category, _VALID_CATEGORIES, "category")
         result = await self._invoke_method(
             method_name="periodically_show_with_duration",
             arguments={
@@ -658,6 +715,7 @@ class FletAndroidNotifications(ft.Service):
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
+                "category": category,
             },
         )
         return self._check_error(result)
@@ -701,6 +759,7 @@ class FletAndroidNotifications(ft.Service):
         channel_bypass_dnd: bool = False,
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
+        category: Optional[str] = None,
     ):
         """Start an Android foreground service with a persistent notification.
 
@@ -729,21 +788,20 @@ class FletAndroidNotifications(ft.Service):
         """
         if notification_id == 0:
             raise ValueError("notification_id must not be 0 for foreground services (Android constraint)")
-        if start_type not in _VALID_START_TYPES:
-            raise ValueError(
-                f"start_type must be one of {sorted(_VALID_START_TYPES)}, got: {start_type!r}"
-            )
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
+        _validate_enum(start_type, _VALID_START_TYPES, "start_type")
         if foreground_service_types is not None:
             for fst in foreground_service_types:
-                if fst not in _VALID_FOREGROUND_SERVICE_TYPES:
-                    raise ValueError(
-                        f"foreground_service_type must be one of "
-                        f"{sorted(_VALID_FOREGROUND_SERVICE_TYPES)}, got: {fst!r}"
-                    )
+                _validate_enum(fst, _VALID_FOREGROUND_SERVICE_TYPES, "foreground_service_type")
+        if large_icon is not None:
+            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
             _validate_color_hex(color)
         if visibility is not None:
             _validate_visibility(visibility)
+        if category is not None:
+            _validate_enum(category, _VALID_CATEGORIES, "category")
         result = await self._invoke_method(
             method_name="start_foreground_service",
             arguments={
@@ -783,6 +841,7 @@ class FletAndroidNotifications(ft.Service):
                 "channel_bypass_dnd": channel_bypass_dnd,
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
+                "category": category,
             },
         )
         return self._check_error(result)
@@ -811,7 +870,10 @@ class FletAndroidNotifications(ft.Service):
             method_name="get_active_notifications",
         )
         self._check_error(result)
-        return json.loads(result)
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise NotificationError(f"failed to parse response: {e}")
 
     async def get_pending_notifications(self) -> list[dict]:
         """Get all pending (scheduled) notification requests.
@@ -826,7 +888,10 @@ class FletAndroidNotifications(ft.Service):
             method_name="get_pending_notifications",
         )
         self._check_error(result)
-        return json.loads(result)
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise NotificationError(f"failed to parse response: {e}")
 
     async def cancel(self, notification_id: int):
         """Cancel a specific notification by ID.

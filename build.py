@@ -22,10 +22,31 @@ BUILD_FLUTTER = ROOT / "build" / "flutter"
 APP_ZIP = BUILD_FLUTTER / "app" / "app.zip"
 APP_ZIP_HASH = BUILD_FLUTTER / "app" / "app.zip.hash"
 RES_DIR = BUILD_FLUTTER / "android" / "app" / "src" / "main" / "res"
-FLUTTER_BIN = Path(r"C:\Users\alexs\flutter\3.41.2\bin\flutter.bat")
+def _find_flutter() -> Path:
+    """Resolve Flutter binary: $FLUTTER_BIN > PATH > latest in ~/flutter/."""
+    if env_bin := os.environ.get("FLUTTER_BIN"):
+        return Path(env_bin)
+    if which_bin := shutil.which("flutter"):
+        return Path(which_bin)
+    flutter_root = Path.home() / "flutter"
+    if flutter_root.is_dir():
+        versions = sorted(
+            (d for d in flutter_root.iterdir() if d.is_dir() and (d / "bin" / "flutter.bat").exists()),
+            key=lambda d: d.name,
+        )
+        if versions:
+            return versions[-1] / "bin" / "flutter.bat"
+    print("ERROR: cannot find Flutter. Set FLUTTER_BIN or add flutter to PATH.")
+    sys.exit(1)
+
+
+FLUTTER_BIN = _find_flutter()
 PACKAGE_SRC = ROOT / "flet_android_notifications" / "src" / "flet_android_notifications"
 TEST_RESOURCES = ROOT / "test_resources"
 PACKAGE_ID = "com.flet.flet_android_notifications_demo"
+
+DART_SRC = ROOT / "flet_android_notifications" / "src" / "flutter" / "flet_android_notifications"
+DART_BUILD = ROOT / "build" / "flutter-packages" / "flet_android_notifications"
 
 SITE_PKG_PREFIX = ".venv/Lib/site-packages/flet_android_notifications/"
 
@@ -147,9 +168,23 @@ def step_copy_test_resources():
     print(f"  created: {keep_xml}")
 
 
+def step_copy_dart_source():
+    """Step 5: copy updated Dart source to build/flutter-packages/."""
+    print("\n=== Step 5: copy Dart source ===")
+    if not DART_BUILD.exists():
+        print(f"  skipping — {DART_BUILD} not found (run full flet build first)")
+        return
+    for dart_file in DART_SRC.rglob("*.dart"):
+        rel = dart_file.relative_to(DART_SRC)
+        dest = DART_BUILD / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(dart_file, dest)
+        print(f"  copied: {rel}")
+
+
 def step_flutter_build():
-    """Step 5: flutter build apk --release."""
-    print("\n=== Step 5: flutter build apk --release ===")
+    """Step 6: flutter build apk --release."""
+    print("\n=== Step 6: flutter build apk --release ===")
     # SERIOUS_PYTHON_SITE_PACKAGES must point to the parent of arch dirs (arm64-v8a/, etc.)
     # flet build creates this at build/site-packages/
     site_packages = ROOT / "build" / "site-packages"
@@ -165,8 +200,8 @@ def step_flutter_build():
 
 
 def step_install():
-    """Step 6: adb uninstall + install + launch."""
-    print("\n=== Step 6: install on device ===")
+    """Step 7: adb uninstall + install + launch."""
+    print("\n=== Step 7: install on device ===")
     apk = BUILD_FLUTTER / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk"
     if not apk.exists():
         print(f"ERROR: APK not found at {apk}")
@@ -198,6 +233,7 @@ def main():
     step_patch_app_zip()
     step_update_hash()
     step_copy_test_resources()
+    step_copy_dart_source()
     step_flutter_build()
 
     if not args.skip_install:
