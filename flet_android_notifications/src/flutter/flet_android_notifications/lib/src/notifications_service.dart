@@ -52,7 +52,7 @@ class NotificationsService extends FletService {
           // on show, but action button presses are always intentional.
           if (!hasAction &&
               _lastShowTime != null &&
-              DateTime.now().difference(_lastShowTime!).inMilliseconds < 1000) {
+              DateTime.now().difference(_lastShowTime!).inMilliseconds < 300) {
             return;
           }
           control.triggerEvent("notification_tap", jsonEncode({
@@ -177,7 +177,7 @@ class NotificationsService extends FletService {
       case "secret":
         return NotificationVisibility.secret;
       default:
-        return null;
+        throw ArgumentError('invalid visibility: $value');
     }
   }
 
@@ -266,7 +266,7 @@ class NotificationsService extends FletService {
           summaryText: style["summary_text"] as String?,
         );
       default:
-        return null;
+        throw ArgumentError('invalid style type: ${style["type"]}');
     }
   }
 
@@ -403,8 +403,8 @@ class NotificationsService extends FletService {
         .map((action) => AndroidNotificationAction(
               action["id"] as String,
               action["title"] as String,
-              cancelNotification: true,
-              showsUserInterface: true,
+              cancelNotification: action["cancel_notification"] as bool? ?? true,
+              showsUserInterface: action["shows_user_interface"] as bool? ?? true,
             ))
         .toList();
   }
@@ -733,7 +733,7 @@ class NotificationsService extends FletService {
           final granted = await _requestExactAlarmPermission();
           return granted.toString();
       }
-      return null;
+      throw ArgumentError('unknown method: $name');
     } catch (e) {
       return "error:${e.runtimeType}: $e";
     }

@@ -226,8 +226,11 @@ class FletAndroidNotifications(ft.Service):
             body: Notification body text.
             payload: Arbitrary string returned in on_notification_tap event.
             actions: List of action buttons shown on the notification. Each is
-                a dict with "id" and "title" keys, e.g.
-                [{"id": "approve", "title": "Approve"}, {"id": "deny", "title": "Deny"}].
+                a dict with "id" and "title" keys, plus optional
+                "cancel_notification" (bool, default True) and
+                "shows_user_interface" (bool, default True). Example:
+                [{"id": "approve", "title": "Approve"},
+                 {"id": "snooze", "title": "Snooze", "cancel_notification": False}].
                 The tapped action's id is returned as "action_id" in the
                 on_notification_tap event data (JSON string).
             channel_id: Android notification channel ID.
@@ -388,6 +391,8 @@ class FletAndroidNotifications(ft.Service):
                 local time. If timezone-aware, converted to UTC internally.
             payload: Arbitrary string returned in on_notification_tap event.
             actions: List of action buttons, each {"id": "...", "title": "..."}.
+                Optional keys: "cancel_notification" (bool, default True),
+                "shows_user_interface" (bool, default True).
             channel_id: Android notification channel ID.
             channel_name: Human-readable channel name.
             channel_description: Channel description.
