@@ -327,13 +327,17 @@ Sound is permanently bound to a channel at creation. Change the sound by using a
 
 ## Samsung OneUI notes
 
-- **Color (regular notifications)**: `color` only tints the small icon. Samsung's "Brief mode"
-  (default compact view) hides even that — swipe down to expand.
-- **`colorized` (regular notifications)**: silently ignored. Per Android contract, this flag only
-  takes effect on foreground service or media-style notifications.
+- **`color` on regular notifications**: the value reaches the OS (verified via `dumpsys
+  notification`) but Samsung Brief mode does not render any visible tint on the small icon. Two
+  notifications, one with `color="#FF0000"` and one without, look identical in the shade. Renders
+  visibly on AOSP/Pixel.
+- **`colorized` on regular notifications**: silently ignored everywhere. Per Android contract,
+  this flag only takes effect on foreground service / media-style notifications.
 - **`colorized` on `start_foreground_service`**: works correctly on Samsung OneUI. The full
-  notification background renders in the requested color (verified on OneUI). See button 23 in
-  the demo `main.py`.
+  notification background renders in the requested color (verified on OneUI Brief mode). See
+  button 23 in the demo `main.py`.
+- **Bottom line for Samsung**: if you need a visibly colored notification, use
+  `start_foreground_service(color=..., colorized=True)`. Regular notifications won't show color.
 
 ## Limitations
 

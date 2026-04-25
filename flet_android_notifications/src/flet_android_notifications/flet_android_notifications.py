@@ -255,11 +255,15 @@ class FletAndroidNotifications(ft.Service):
             large_icon: Large icon shown on the notification's right side.
                 Interpreted according to large_icon_type.
             large_icon_type: "drawable_resource" (default) or "file_path".
-            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
-                the accent color, which also tints the small icon.
-                Note: Samsung OneUI's "Brief" notification mode (default
-                on Galaxy devices) hides this entirely — users must expand
-                the notification to see any color.
+            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). The
+                Android contract says this tints the small icon and
+                accent areas. In practice, on Samsung OneUI (Brief mode,
+                default on Galaxy) the value reaches the OS but is NOT
+                rendered visibly for regular notifications — verified by
+                comparing two notifications side-by-side, one with color
+                set and one without, both look identical. Renders
+                visibly on AOSP/Pixel. Reliable visible color on Samsung
+                requires start_foreground_service() with colorized=True.
             colorized: When True, applies color as the notification
                 background. Per Android contract, has effect ONLY on
                 foreground service or media-style notifications — for a
@@ -431,11 +435,15 @@ class FletAndroidNotifications(ft.Service):
             large_icon: Large icon shown on the notification's right side.
                 Interpreted according to large_icon_type.
             large_icon_type: "drawable_resource" (default) or "file_path".
-            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
-                the accent color, which also tints the small icon.
-                Note: Samsung OneUI's "Brief" notification mode (default
-                on Galaxy devices) hides this entirely — users must expand
-                the notification to see any color.
+            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). The
+                Android contract says this tints the small icon and
+                accent areas. In practice, on Samsung OneUI (Brief mode,
+                default on Galaxy) the value reaches the OS but is NOT
+                rendered visibly for regular notifications — verified by
+                comparing two notifications side-by-side, one with color
+                set and one without, both look identical. Renders
+                visibly on AOSP/Pixel. Reliable visible color on Samsung
+                requires start_foreground_service() with colorized=True.
             colorized: When True, applies color as the notification
                 background. Per Android contract, has effect ONLY on
                 foreground service or media-style notifications — for a

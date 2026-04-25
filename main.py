@@ -521,8 +521,8 @@ def main(page: ft.Page):
                 ft.Button(content="1. Baseline (no new params)", on_click=send_baseline),
                 ft.Divider(height=1),
                 ft.Button(content="2. Colored (pure red)", on_click=send_colored),
-                hint("color tints the small icon only (look closely — it's red).\n"
-                     "background tint is OS-stripped on Samsung; works on Pixel/AOSP."),
+                hint("color reaches the OS but Samsung Brief mode renders NO visible tint.\n"
+                     "for visibly colored notifications on Samsung, use button 23 instead."),
                 ft.Divider(height=1),
                 ft.Button(content="3. Group (3 + summary)", on_click=send_group),
                 hint("should see collapsed group with InboxStyle summary.\n"
