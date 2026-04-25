@@ -76,7 +76,6 @@ def main(page: ft.Page):
     # -- 3. grouping with InboxStyle summary --
     async def send_group(e):
         try:
-            await notifications.cancel_all()
             ids = []
             for i in range(3):
                 nid = next_id()
