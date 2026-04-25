@@ -51,10 +51,10 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"Baseline #{nid}",
+                title="Baseline #1",
                 body="No new params, just a regular notification.",
             )
-            set_log(f"OK baseline #{nid}")
+            set_log(f"OK baseline #1 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL baseline: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
 
@@ -64,12 +64,12 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"COLORED #{nid}",
+                title="COLORED #2",
                 body="Should have RED accent color on small icon.",
                 color="#FF0000",
                 icon="ic_notification",
             )
-            set_log(f"OK colored #{nid}")
+            set_log(f"OK colored #2 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL colored: {type(ex).__name__}: {ex}")
 
@@ -83,7 +83,7 @@ def main(page: ft.Page):
                 ids.append(nid)
                 await notifications.show_notification(
                     notification_id=nid,
-                    title=f"Group child {i + 1} (#{nid})",
+                    title=f"Group child {i + 1} (#3)",
                     body=f"Grouped message {i + 1}.",
                     group_key="test_group",
                     group_alert_behavior="summary",
@@ -93,7 +93,7 @@ def main(page: ft.Page):
             ids.append(nid)
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"GROUP SUMMARY (#{nid})",
+                title="GROUP SUMMARY #3",
                 body="You have 3 messages.",
                 group_key="test_group",
                 set_as_group_summary=True,
@@ -104,7 +104,7 @@ def main(page: ft.Page):
                 ),
                 icon="ic_notification",
             )
-            set_log(f"OK group ids={ids}")
+            set_log(f"OK group #3 (ids={ids})")
         except Exception as ex:
             set_log(f"FAIL group: {type(ex).__name__}: {ex}")
 
@@ -114,13 +114,13 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"LARGE ICON #{nid}",
+                title="LARGE ICON #4a",
                 body="Small thumbnail on right side (Android large_icon is always a thumbnail).",
                 large_icon="splash",
                 large_icon_type="drawable_resource",
                 icon="ic_notification",
             )
-            set_log(f"OK large icon #{nid}")
+            set_log(f"OK large icon #4a (id={nid})")
         except Exception as ex:
             set_log(f"FAIL large icon: {type(ex).__name__}: {ex}")
 
@@ -130,7 +130,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"BIG PICTURE #{nid}",
+                title="BIG PICTURE #4b",
                 body="Expand to see full-width image.",
                 style=BigPictureStyle(
                     drawable_resource="splash",
@@ -139,7 +139,7 @@ def main(page: ft.Page):
                 ),
                 icon="ic_notification",
             )
-            set_log(f"OK big picture #{nid}")
+            set_log(f"OK big picture #4b (id={nid})")
         except Exception as ex:
             set_log(f"FAIL big picture: {type(ex).__name__}: {ex}")
 
@@ -149,10 +149,10 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"DEFAULT ICON #{nid}",
+                title="DEFAULT ICON #5",
                 body="Uses default launcher icon — compare with bell on other notifications.",
             )
-            set_log(f"OK default icon #{nid}")
+            set_log(f"OK default icon #5 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL default icon: {type(ex).__name__}: {ex}")
 
@@ -162,14 +162,14 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"SOUND #{nid}",
+                title="SOUND #6",
                 body="Should play a short 880Hz beep.",
                 sound="test_beep",
                 channel_id="beep_channel",
                 channel_name="Beep Channel",
                 icon="ic_notification",
             )
-            set_log(f"OK sound #{nid}")
+            set_log(f"OK sound #6 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL sound: {type(ex).__name__}: {ex}")
 
@@ -179,7 +179,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"SILENT #{nid}",
+                title="SILENT #7",
                 body="No sound, no vibration.",
                 play_sound=False,
                 enable_vibration=False,
@@ -187,7 +187,7 @@ def main(page: ft.Page):
                 channel_name="Silent",
                 icon="ic_notification",
             )
-            set_log(f"OK silent #{nid}")
+            set_log(f"OK silent #7 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL silent: {type(ex).__name__}: {ex}")
 
@@ -203,7 +203,7 @@ def main(page: ft.Page):
             )
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"BIG TEXT #{nid}",
+                title="BIG TEXT #8",
                 body="Expand to read the full message...",
                 style=BigTextStyle(
                     big_text=long_text,
@@ -212,7 +212,7 @@ def main(page: ft.Page):
                 ),
                 icon="ic_notification",
             )
-            set_log(f"OK big text #{nid}")
+            set_log(f"OK big text #8 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL big text: {type(ex).__name__}: {ex}")
 
@@ -222,7 +222,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"PROGRESS #{nid}",
+                title="PROGRESS #9",
                 body="Downloading... 65%",
                 show_progress=True,
                 max_progress=100,
@@ -230,7 +230,7 @@ def main(page: ft.Page):
                 ongoing=True,
                 icon="ic_notification",
             )
-            set_log(f"OK progress #{nid}")
+            set_log(f"OK progress #9 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL progress: {type(ex).__name__}: {ex}")
 
@@ -240,14 +240,14 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"INDETERMINATE #{nid}",
+                title="INDETERMINATE #10",
                 body="Processing...",
                 show_progress=True,
                 indeterminate=True,
                 ongoing=True,
                 icon="ic_notification",
             )
-            set_log(f"OK indeterminate #{nid}")
+            set_log(f"OK indeterminate #10 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL indeterminate: {type(ex).__name__}: {ex}")
 
@@ -257,7 +257,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"ONGOING #{nid}",
+                title="ONGOING #11",
                 body="This can't be swiped away. Use cancel all to dismiss.",
                 ongoing=True,
                 auto_cancel=False,
@@ -266,7 +266,7 @@ def main(page: ft.Page):
                 importance="default",
                 icon="ic_notification",
             )
-            set_log(f"OK ongoing #{nid}")
+            set_log(f"OK ongoing #11 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL ongoing: {type(ex).__name__}: {ex}")
 
@@ -276,7 +276,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"ACTIONS #{nid}",
+                title="ACTIONS #12",
                 body="Tap an action button below.",
                 payload=f"payload_for_{nid}",
                 actions=[
@@ -285,7 +285,7 @@ def main(page: ft.Page):
                 ],
                 icon="ic_notification",
             )
-            set_log(f"OK actions #{nid} — tap an action, check log")
+            set_log(f"OK actions #12 (id={nid}) — tap an action, check log")
         except Exception as ex:
             set_log(f"FAIL actions: {type(ex).__name__}: {ex}")
 
@@ -295,32 +295,40 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"SUB TEXT #{nid}",
+                title="SUB TEXT #13",
                 body="Look for 'HELLO-SUB-TEXT' in notification header.",
                 sub_text="HELLO-SUB-TEXT",
                 channel_id="subtext_ch",
                 channel_name="Sub Text",
                 icon="ic_notification",
             )
-            set_log(f"OK sub text #{nid}")
+            set_log(f"OK sub text #13 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL sub text: {type(ex).__name__}: {ex}")
 
-    # -- 14. visibility (secret — hidden on lock screen) --
+    # -- 14. visibility (secret — hidden on lock screen).
+    # Schedules at +8s so user has time to lock the screen before it fires.
+    # NOTE: importance MUST be at least "default" — IMPORTANCE_MIN (the previous
+    # value here) makes the notification have no sound/heads-up/status-icon and
+    # buries it in a hidden shade section, which is indistinguishable from
+    # "didn't fire". visibility="secret" already does the lock-screen-hide job;
+    # they are independent dimensions.
     async def send_visibility(e):
         try:
             nid = next_id()
-            await notifications.show_notification(
+            fire_at = datetime.now() + timedelta(seconds=8)
+            await notifications.schedule_notification(
                 notification_id=nid,
-                title=f"SECRET #{nid}",
-                body="This should NOT appear on lock screen.",
+                title="SECRET #14",
+                body="LOCK YOUR PHONE NOW — fires in 8s. Should NOT show on lock screen.",
+                scheduled_time=fire_at,
                 visibility="secret",
-                channel_id="secret_ch",
+                channel_id="secret_ch_v2",
                 channel_name="Secret",
-                importance="min",
+                importance="default",
                 icon="ic_notification",
             )
-            set_log(f"OK secret #{nid} — lock screen to verify")
+            set_log(f"OK secret #14 (id={nid}) — lock phone NOW, fires in 8s")
         except Exception as ex:
             set_log(f"FAIL visibility: {type(ex).__name__}: {ex}")
 
@@ -330,7 +338,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"ALERT ONCE #{nid}",
+                title="ALERT ONCE #15",
                 body="First show — you should hear a sound NOW.",
                 only_alert_once=True,
                 channel_id="alert_once_ch",
@@ -341,7 +349,7 @@ def main(page: ft.Page):
             # update same ID but on a silent channel — guarantees no re-alert
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"ALERT ONCE #{nid} (updated silently)",
+                title="ALERT ONCE #15 (updated silently)",
                 body="This update was SILENT — no sound or vibration.",
                 only_alert_once=True,
                 silent=True,
@@ -352,7 +360,7 @@ def main(page: ft.Page):
                 importance="low",
                 icon="ic_notification",
             )
-            set_log(f"OK alert once #{nid} — second show was silent")
+            set_log(f"OK alert once #15 (id={nid}) — second show was silent")
         except Exception as ex:
             set_log(f"FAIL only alert once: {type(ex).__name__}: {ex}")
 
@@ -362,7 +370,7 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"VIBRATION #{nid}",
+                title="VIBRATION #16",
                 body="3 short buzzes with long pauses (no sound).",
                 vibration_pattern=[0, 200, 1000, 200, 1000, 200],
                 play_sound=False,
@@ -370,7 +378,7 @@ def main(page: ft.Page):
                 channel_name="Vibration Pattern",
                 icon="ic_notification",
             )
-            set_log(f"OK vibration #{nid}")
+            set_log(f"OK vibration #16 (id={nid})")
         except Exception as ex:
             set_log(f"FAIL vibration: {type(ex).__name__}: {ex}")
 
@@ -381,12 +389,12 @@ def main(page: ft.Page):
             fire_at = datetime.now() + timedelta(seconds=10)
             await notifications.schedule_notification(
                 notification_id=nid,
-                title=f"SCHEDULED #{nid}",
+                title="SCHEDULED #17",
                 body=f"Fired at {fire_at.strftime('%H:%M:%S')} (10s delay).",
                 scheduled_time=fire_at,
                 icon="ic_notification",
             )
-            set_log(f"OK scheduled #{nid} — fires in ~10s")
+            set_log(f"OK scheduled #17 (id={nid}) — fires in ~10s")
         except Exception as ex:
             set_log(f"FAIL scheduled: {type(ex).__name__}: {ex}")
 
@@ -396,42 +404,64 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.show_notification(
                 notification_id=nid,
-                title=f"TIMEOUT #{nid}",
+                title="TIMEOUT #18",
                 body="Auto-dismisses after 5 seconds.",
                 timeout_after=5000,
                 icon="ic_notification",
             )
-            set_log(f"OK timeout #{nid} — disappears in 5s")
+            set_log(f"OK timeout #18 (id={nid}) — disappears in 5s")
         except Exception as ex:
             set_log(f"FAIL timeout: {type(ex).__name__}: {ex}")
 
-    # -- 19. periodic notification (every minute) --
+    # -- 19. periodic notification using PRESET interval enum.
+    # Calls flutter_local_notifications.periodicallyShow which only accepts the
+    # fixed enum values: every_minute, hourly, daily, weekly. For arbitrary
+    # intervals (e.g. 90s, 5min) use button 20 instead.
+    # periodicallyShow fires the FIRST notification at now+interval (so a 60s
+    # wait for every_minute). The kickoff show_notification below gives the
+    # user instant feedback that the call worked.
     async def send_periodic(e):
         try:
             nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="PERIODIC #19 (kickoff)",
+                body="Periodic scheduled. Next one in ~1 minute.",
+                icon="ic_notification",
+            )
             await notifications.periodically_show(
                 notification_id=nid,
-                title=f"PERIODIC #{nid}",
+                title="PERIODIC #19",
                 body="Repeats every minute.",
                 repeat_interval="every_minute",
                 icon="ic_notification",
             )
-            set_log(f"OK periodic #{nid} — repeats every minute")
+            set_log(f"OK periodic #19 (id={nid}) — kickoff now, next in ~60s")
         except Exception as ex:
             set_log(f"FAIL periodic: {type(ex).__name__}: {ex}")
 
-    # -- 20. periodic with custom duration (90s) --
+    # -- 20. periodic with ARBITRARY duration (any number of seconds).
+    # Calls flutter_local_notifications.periodicallyShowWithDuration which
+    # takes a Duration, so anything from a few seconds upward is allowed.
+    # Use this when you need a custom interval not covered by button 19's
+    # preset enum (90s here, but could be 30s, 5min, 12h, etc).
     async def send_periodic_duration(e):
         try:
             nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="PERIODIC DURATION #20 (kickoff)",
+                body="Periodic scheduled. Next one in ~90 seconds.",
+                icon="ic_notification",
+            )
             await notifications.periodically_show_with_duration(
                 notification_id=nid,
-                title=f"PERIODIC DURATION #{nid}",
+                title="PERIODIC DURATION #20",
                 body="Repeats every 90 seconds.",
                 duration_seconds=90,
                 icon="ic_notification",
             )
-            set_log(f"OK periodic duration #{nid} — repeats every 90s")
+            set_log(f"OK periodic duration #20 (id={nid}) — kickoff now, next in ~90s")
         except Exception as ex:
             set_log(f"FAIL periodic duration: {type(ex).__name__}: {ex}")
 
@@ -457,12 +487,12 @@ def main(page: ft.Page):
             nid = next_id()
             await notifications.start_foreground_service(
                 notification_id=nid,
-                title=f"FOREGROUND #{nid}",
+                title="FOREGROUND #23",
                 body="Foreground service running with special_use type.",
                 foreground_service_types=["special_use"],
                 icon="ic_notification",
             )
-            set_log(f"OK foreground #{nid} - use stop button to end")
+            set_log(f"OK foreground #23 (id={nid}) - use stop button to end")
         except Exception as ex:
             set_log(f"FAIL foreground: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
 
@@ -489,8 +519,8 @@ def main(page: ft.Page):
                 ft.Button(content="1. Baseline (no new params)", on_click=send_baseline),
                 ft.Divider(height=1),
                 ft.Button(content="2. Colored (pure red)", on_click=send_colored),
-                hint("swipe DOWN on notification to expand it fully.\n"
-                     "Samsung Brief mode hides color — must expand."),
+                hint("color tints the small icon only (look closely — it's red).\n"
+                     "background tint is OS-stripped on Samsung; works on Pixel/AOSP."),
                 ft.Divider(height=1),
                 ft.Button(content="3. Group (3 + summary)", on_click=send_group),
                 hint("should see collapsed group with InboxStyle summary.\n"
@@ -540,9 +570,9 @@ def main(page: ft.Page):
                      "next to app name, or below body when expanded."),
                 ft.Divider(height=1),
                 ft.Button(content="14. Secret (lock screen)", on_click=send_visibility),
-                hint("should NOT appear on lock screen.\n"
-                     "Samsung: Settings > Lock screen > Notifications\n"
-                     "must be set to 'hide content' or 'icons only'."),
+                hint("tap, then LOCK YOUR PHONE within 8s — fires while locked.\n"
+                     "with visibility='secret' it should NOT show on lock screen.\n"
+                     "Samsung: also set Settings > Lock screen > Notifications to 'hide content'."),
                 ft.Divider(height=1),
                 ft.Button(content="15. Only alert once", on_click=send_only_alert_once),
                 hint("first show plays sound, then 1s later updates silently.\n"
@@ -560,13 +590,13 @@ def main(page: ft.Page):
                 hint("notification disappears after 5 seconds.\n"
                      "watch the shade — it should vanish on its own."),
                 ft.Divider(height=1),
-                ft.Button(content="19. Periodic (every minute)", on_click=send_periodic),
-                hint("repeats every minute. use 'cancel all' to stop.\n"
-                     "Android may batch/delay in doze mode."),
+                ft.Button(content="19. Periodic (preset enum)", on_click=send_periodic),
+                hint("uses preset enum (every_minute/hourly/daily/weekly only).\n"
+                     "kickoff fires now, recurring at +60s. 'cancel all' to stop."),
                 ft.Divider(height=1),
-                ft.Button(content="20. Periodic duration (90s)", on_click=send_periodic_duration),
-                hint("repeats every 90 seconds via custom duration.\n"
-                     "use 'cancel all' to stop."),
+                ft.Button(content="20. Periodic duration (custom)", on_click=send_periodic_duration),
+                hint("uses arbitrary Duration (90s here; could be any seconds).\n"
+                     "kickoff fires now, recurring at +90s. 'cancel all' to stop."),
                 ft.Divider(height=1),
                 ft.Button(content="21. Get active notifications", on_click=query_active),
                 hint("shows currently displayed notifications.\n"

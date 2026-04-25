@@ -48,7 +48,35 @@ PACKAGE_ID = "com.flet.flet_android_notifications_demo"
 DART_SRC = ROOT / "flet_android_notifications" / "src" / "flutter" / "flet_android_notifications"
 DART_BUILD = ROOT / "build" / "flutter-packages" / "flet_android_notifications"
 
+ANDROID_MANIFEST = BUILD_FLUTTER / "android" / "app" / "src" / "main" / "AndroidManifest.xml"
+APP_GRADLE = BUILD_FLUTTER / "android" / "app" / "build.gradle.kts"
+
 SITE_PKG_PREFIX = ".venv/Lib/site-packages/flet_android_notifications/"
+
+# Required AndroidManifest entries for flutter_local_notifications scheduling and foreground
+# services. flet build apk regenerates AndroidManifest.xml from a template each run, wiping
+# any manual additions, so we re-inject these every build.
+FLN_MANIFEST_ENTRIES = """\
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+        <service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+"""
+
+MANIFEST_SENTINEL = "ScheduledNotificationReceiver"
+GRADLE_SENTINEL = "isCoreLibraryDesugaringEnabled"
 
 
 def run(cmd, cwd=None, env=None):
@@ -65,6 +93,73 @@ def step_flet_build():
     print("\n=== Step 1: flet build apk ===")
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     run("flet build apk -v", cwd=str(ROOT), env=env)
+
+
+def step_patch_manifest():
+    """Step 1b: inject flutter_local_notifications receivers + foreground service into AndroidManifest.
+
+    Required for schedule_notification, periodically_show, and foreground service to fire/run
+    at all — not just to survive reboots. flet build wipes AndroidManifest.xml each run.
+    """
+    print("\n=== Step 1b: patch AndroidManifest.xml ===")
+    if not ANDROID_MANIFEST.exists():
+        print(f"ERROR: {ANDROID_MANIFEST} not found. Run flet build first.")
+        sys.exit(1)
+    text = ANDROID_MANIFEST.read_text(encoding="utf-8")
+    if MANIFEST_SENTINEL in text:
+        print("  already patched, skipping")
+        return
+    if "</application>" not in text:
+        print("ERROR: no </application> tag found in AndroidManifest.xml")
+        sys.exit(1)
+    new_text = text.replace("</application>", FLN_MANIFEST_ENTRIES + "    </application>")
+    ANDROID_MANIFEST.write_text(new_text, encoding="utf-8")
+    print(f"  injected receivers + foreground service into {ANDROID_MANIFEST.name}")
+
+
+def step_patch_gradle():
+    """Step 1c: enable core library desugaring in app/build.gradle.kts.
+
+    flutter_local_notifications v19+ uses Java 8 APIs that need desugaring. flet build
+    regenerates build.gradle.kts each run.
+    """
+    print("\n=== Step 1c: patch build.gradle.kts (desugaring) ===")
+    if not APP_GRADLE.exists():
+        print(f"ERROR: {APP_GRADLE} not found. Run flet build first.")
+        sys.exit(1)
+    text = APP_GRADLE.read_text(encoding="utf-8")
+    if GRADLE_SENTINEL in text:
+        print("  already patched, skipping")
+        return
+
+    # Inject inside compileOptions { ... }
+    co_marker = "targetCompatibility = JavaVersion.VERSION_17"
+    if co_marker not in text:
+        print(f"ERROR: cannot find compileOptions marker '{co_marker}'")
+        sys.exit(1)
+    new_text = text.replace(
+        co_marker,
+        co_marker + "\n        isCoreLibraryDesugaringEnabled = true",
+    )
+
+    # Inject coreLibraryDesugaring dep
+    if "dependencies {}" in new_text:
+        new_text = new_text.replace(
+            "dependencies {}",
+            'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}',
+        )
+    elif "dependencies {" in new_text:
+        new_text = new_text.replace(
+            "dependencies {",
+            'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")',
+            1,
+        )
+    else:
+        print("ERROR: cannot find dependencies block in build.gradle.kts")
+        sys.exit(1)
+
+    APP_GRADLE.write_text(new_text, encoding="utf-8")
+    print(f"  enabled desugaring in {APP_GRADLE.name}")
 
 
 def step_patch_app_zip():
@@ -230,6 +325,8 @@ def main():
     if not args.skip_flet:
         step_flet_build()
 
+    step_patch_manifest()
+    step_patch_gradle()
     step_patch_app_zip()
     step_update_hash()
     step_copy_test_resources()

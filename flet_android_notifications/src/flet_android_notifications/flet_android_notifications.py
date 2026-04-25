@@ -257,8 +257,16 @@ class FletAndroidNotifications(ft.Service):
             large_icon_type: "drawable_resource" (default) or "file_path".
             color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
                 the accent color, which also tints the small icon.
-            colorized: When True, applies color as background. Only works
-                on foreground service / media-style notifications.
+                Note: Samsung OneUI's "Brief" notification mode (default
+                on Galaxy devices) hides this entirely — users must expand
+                the notification to see any color.
+            colorized: When True, applies color as the notification
+                background. Has effect ONLY on foreground service or
+                media-style notifications (Android contract). Even then,
+                Samsung OneUI strips this at the OS level — the background
+                stays neutral. Verified working on AOSP/Pixel only. Pass
+                this for cross-OEM correctness; do not rely on it visually
+                on Samsung.
             sound: Raw resource name (e.g. "alert_tone" for
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
@@ -425,8 +433,16 @@ class FletAndroidNotifications(ft.Service):
             large_icon_type: "drawable_resource" (default) or "file_path".
             color: Hex color string (e.g. "#FF5722" or "#80FF5722"). Sets
                 the accent color, which also tints the small icon.
-            colorized: When True, applies color as background. Only works
-                on foreground service / media-style notifications.
+                Note: Samsung OneUI's "Brief" notification mode (default
+                on Galaxy devices) hides this entirely — users must expand
+                the notification to see any color.
+            colorized: When True, applies color as the notification
+                background. Has effect ONLY on foreground service or
+                media-style notifications (Android contract). Even then,
+                Samsung OneUI strips this at the OS level — the background
+                stays neutral. Verified working on AOSP/Pixel only. Pass
+                this for cross-OEM correctness; do not rely on it visually
+                on Samsung.
             sound: Raw resource name (e.g. "alert_tone" for
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing

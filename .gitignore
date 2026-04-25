@@ -19,3 +19,8 @@ uv.lock
 
 # Local dev notes
 insights/
+
+# Flutter pub get artifacts
+.dart_tool/
+.flutter-plugins-dependencies
+pubspec.lock

@@ -14,7 +14,7 @@ Add to your `pyproject.toml`:
 
 ```toml
 [project]
-dependencies = ["flet>=0.80.5", "flet-android-notifications"]
+dependencies = ["flet>=0.82.0", "flet-android-notifications"]
 
 [tool.flet.android.permission]
 "android.permission.POST_NOTIFICATIONS" = true
@@ -145,7 +145,7 @@ These work on all four methods above.
 | `large_icon` | `str\|None` | `None` | thumbnail on right side |
 | `large_icon_type` | `str` | `"drawable_resource"` | or `"file_path"` |
 | `color` | `str\|None` | `None` | hex accent color, e.g. `"#FF5722"` |
-| `colorized` | `bool` | `False` | color as background (foreground service only) |
+| `colorized` | `bool` | `False` | color as background. foreground service only; ignored by Samsung OneUI |
 | `sub_text` | `str\|None` | `None` | small text below content |
 | `visibility` | `str\|None` | `None` | `"public"`, `"private"`, or `"secret"` |
 
@@ -283,7 +283,7 @@ The desugaring patch is needed because `flutter_local_notifications` v19+ uses J
 
 ### AndroidManifest.xml for scheduled notifications
 
-Register BroadcastReceivers inside `<application>` in `build/flutter/android/app/src/main/AndroidManifest.xml` so scheduled notifications survive reboots:
+Register BroadcastReceivers inside `<application>` in `build/flutter/android/app/src/main/AndroidManifest.xml`. **Required for `schedule_notification`, `periodically_show`, and `periodically_show_with_duration` to fire at all** (not just for surviving reboots — without these, AlarmManager fires but has no listener and the notification is silently dropped):
 
 ```xml
 <receiver android:exported="false"
@@ -329,7 +329,10 @@ Sound is permanently bound to a channel at creation. Change the sound by using a
 
 - **Color**: Samsung's system palette overrides the `color` parameter. Works on stock Android, ignored on Samsung.
 - **Brief mode**: Samsung's compact notification view hides expanded content. Swipe down to expand.
-- **`colorized`**: only works for foreground service / media-style notifications (all OEMs).
+- **`colorized`**: per Android contract, only takes effect on foreground service / media-style
+  notifications. Additionally, Samsung OneUI strips it at the OS level even when the contract is
+  met — the background stays neutral. Verified working only on AOSP/Pixel. Pass it for cross-OEM
+  correctness; do not rely on it visually on Samsung.
 
 ## Limitations
 

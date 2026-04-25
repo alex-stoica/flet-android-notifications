@@ -2,9 +2,9 @@
 name = "flet-android-notifications-demo"
 version = "0.1.0"
 description = "Demo app for flet-android-notifications"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "flet>=0.80.5",
+    "flet>=0.82.0",
     "flet-android-notifications",
 ]
 
