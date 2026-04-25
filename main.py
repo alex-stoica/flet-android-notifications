@@ -491,6 +491,8 @@ def main(page: ft.Page):
                 body="Foreground service running with special_use type.",
                 foreground_service_types=["special_use"],
                 icon="ic_notification",
+                color="#FF0000",
+                colorized=True,
             )
             set_log(f"OK foreground #23 (id={nid}) - use stop button to end")
         except Exception as ex:
@@ -607,7 +609,7 @@ def main(page: ft.Page):
                      "schedule or set periodic first, then tap this."),
                 ft.Divider(height=1),
                 ft.Button(content="23. Foreground service (start)", on_click=send_foreground),
-                hint("starts foreground service with special_use type.\n"
+                hint("starts foreground service with FULL RED background (colorized).\n"
                      "persistent notification, can't be swiped away."),
                 ft.Button(content="23. Foreground service (stop)", on_click=stop_foreground),
                 ft.Divider(),

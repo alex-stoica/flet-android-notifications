@@ -145,7 +145,7 @@ These work on all four methods above.
 | `large_icon` | `str\|None` | `None` | thumbnail on right side |
 | `large_icon_type` | `str` | `"drawable_resource"` | or `"file_path"` |
 | `color` | `str\|None` | `None` | hex accent color, e.g. `"#FF5722"` |
-| `colorized` | `bool` | `False` | color as background. foreground service only; ignored by Samsung OneUI |
+| `colorized` | `bool` | `False` | color as background — only takes effect on `start_foreground_service` calls |
 | `sub_text` | `str\|None` | `None` | small text below content |
 | `visibility` | `str\|None` | `None` | `"public"`, `"private"`, or `"secret"` |
 
@@ -327,12 +327,13 @@ Sound is permanently bound to a channel at creation. Change the sound by using a
 
 ## Samsung OneUI notes
 
-- **Color**: Samsung's system palette overrides the `color` parameter. Works on stock Android, ignored on Samsung.
-- **Brief mode**: Samsung's compact notification view hides expanded content. Swipe down to expand.
-- **`colorized`**: per Android contract, only takes effect on foreground service / media-style
-  notifications. Additionally, Samsung OneUI strips it at the OS level even when the contract is
-  met — the background stays neutral. Verified working only on AOSP/Pixel. Pass it for cross-OEM
-  correctness; do not rely on it visually on Samsung.
+- **Color (regular notifications)**: `color` only tints the small icon. Samsung's "Brief mode"
+  (default compact view) hides even that — swipe down to expand.
+- **`colorized` (regular notifications)**: silently ignored. Per Android contract, this flag only
+  takes effect on foreground service or media-style notifications.
+- **`colorized` on `start_foreground_service`**: works correctly on Samsung OneUI. The full
+  notification background renders in the requested color (verified on OneUI). See button 23 in
+  the demo `main.py`.
 
 ## Limitations
 

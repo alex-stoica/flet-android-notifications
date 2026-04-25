@@ -261,12 +261,12 @@ class FletAndroidNotifications(ft.Service):
                 on Galaxy devices) hides this entirely — users must expand
                 the notification to see any color.
             colorized: When True, applies color as the notification
-                background. Has effect ONLY on foreground service or
-                media-style notifications (Android contract). Even then,
-                Samsung OneUI strips this at the OS level — the background
-                stays neutral. Verified working on AOSP/Pixel only. Pass
-                this for cross-OEM correctness; do not rely on it visually
-                on Samsung.
+                background. Per Android contract, has effect ONLY on
+                foreground service or media-style notifications — for a
+                regular show_notification call this flag is silently
+                ignored. Use start_foreground_service() with color +
+                colorized for a fully colored background. Verified working
+                on Samsung OneUI when wired up correctly.
             sound: Raw resource name (e.g. "alert_tone" for
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
@@ -437,12 +437,12 @@ class FletAndroidNotifications(ft.Service):
                 on Galaxy devices) hides this entirely — users must expand
                 the notification to see any color.
             colorized: When True, applies color as the notification
-                background. Has effect ONLY on foreground service or
-                media-style notifications (Android contract). Even then,
-                Samsung OneUI strips this at the OS level — the background
-                stays neutral. Verified working on AOSP/Pixel only. Pass
-                this for cross-OEM correctness; do not rely on it visually
-                on Samsung.
+                background. Per Android contract, has effect ONLY on
+                foreground service or media-style notifications — for a
+                regular show_notification call this flag is silently
+                ignored. Use start_foreground_service() with color +
+                colorized for a fully colored background. Verified working
+                on Samsung OneUI when wired up correctly.
             sound: Raw resource name (e.g. "alert_tone" for
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
