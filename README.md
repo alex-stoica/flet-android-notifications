@@ -4,6 +4,14 @@ Native Android notifications for Flet apps. Bridges Python to the `flutter_local
 
 Flet has no built-in notification support, and Python-side approaches (plyer, Pyjnius) fail because Flet's Python process is sandboxed from Android APIs.
 
+<p align="center">
+  <img src="docs/screenshots/style-showcase.png" width="45%" alt="Demo notifications: actions, progress, BigText, large icon, BigPicture" />
+  &nbsp;
+  <img src="docs/screenshots/colorized-foreground-service.png" width="45%" alt="Foreground service with red colorized background on Samsung OneUI, plus secret/sub-text/vibration variants" />
+</p>
+
+*Left: action buttons, determinate progress, BigTextStyle, large icon thumbnail, BigPictureStyle. Right: indeterminate progress, scheduled secret, sub-text header, only-alert-once, custom vibration, and a foreground service with `colorized=True` (full red background — verified on Samsung OneUI). All from the demo app in `main.py`.*
+
 ## Install
 
 ```bash
