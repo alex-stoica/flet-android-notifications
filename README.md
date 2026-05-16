@@ -18,7 +18,7 @@ Flet has no built-in notification support, and Python-side approaches (plyer, Py
 pip install flet-android-notifications
 ```
 
-Add to your `pyproject.toml`:
+For a normal app, add only the PyPI dependency and Android permissions to your `pyproject.toml`:
 
 ```toml
 [project]
@@ -28,13 +28,19 @@ dependencies = ["flet>=0.82.0", "flet-android-notifications"]
 "android.permission.POST_NOTIFICATIONS" = true
 "android.permission.SCHEDULE_EXACT_ALARM" = true      # for scheduled/periodic
 "android.permission.RECEIVE_BOOT_COMPLETED" = true     # survive reboots
+```
 
+Do **not** copy the demo app's local-development settings into your app:
+
+```toml
 [tool.flet.app]
 exclude = ["flet_android_notifications"]
 
 [tool.flet.dev_packages]
 flet-android-notifications = "flet_android_notifications"
 ```
+
+Those settings are only for building this repository's demo app against the local checkout. In a normal app installed from PyPI, `tool.flet.dev_packages` makes `flet build apk` pass `flet-android-notifications @ flet_android_notifications` to pip. If your app does not contain a local `flet_android_notifications` directory, pip rejects it as an invalid URL.
 
 ## Quick start
 
