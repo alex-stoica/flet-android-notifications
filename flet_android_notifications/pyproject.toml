@@ -1,6 +1,6 @@
 [project]
 name = "flet-android-notifications"
-version = "0.7.9"
+version = "0.8.0"
 description = "Native local notifications for Flet apps (Android)"
 requires-python = ">=3.11"
 readme = "../README.md"
@@ -25,6 +25,9 @@ dependencies = [
 Homepage = "https://github.com/alex-stoica/flet-android-notifications"
 Repository = "https://github.com/alex-stoica/flet-android-notifications"
 Issues = "https://github.com/alex-stoica/flet-android-notifications/issues"
+
+[project.scripts]
+flet-android-notifications-patch = "flet_android_notifications.patcher:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flet_android_notifications", "src/flutter"]

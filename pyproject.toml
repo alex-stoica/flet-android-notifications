@@ -14,6 +14,7 @@ dependencies = [
 "android.permission.RECEIVE_BOOT_COMPLETED" = true
 "android.permission.FOREGROUND_SERVICE" = true
 "android.permission.FOREGROUND_SERVICE_SPECIAL_USE" = true
+"android.permission.USE_FULL_SCREEN_INTENT" = true
 
 [tool.flet.app]
 exclude = ["flet_android_notifications"]

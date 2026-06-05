@@ -1,11 +1,33 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data' show Int64List;
-import 'dart:ui' show Color;
+import 'dart:ui' show Color, DartPluginRegistrant;
 import 'package:flet/flet.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+
+const String _backgroundResponsesKey =
+    'flet_android_notifications_background_responses';
+
+String _notificationResponseToJson(NotificationResponse response) => jsonEncode({
+      "notification_id": response.id,
+      "payload": response.payload ?? "",
+      "action_id": response.actionId ?? "",
+      "input": response.input ?? "",
+      "response_type": response.notificationResponseType.name,
+    });
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) {
+  DartPluginRegistrant.ensureInitialized();
+  SharedPreferences.getInstance().then((prefs) {
+    final responses = prefs.getStringList(_backgroundResponsesKey) ?? <String>[];
+    responses.add(_notificationResponseToJson(response));
+    return prefs.setStringList(_backgroundResponsesKey, responses);
+  });
+}
 
 class NotificationsService extends FletService {
   NotificationsService({required super.control});
@@ -14,6 +36,7 @@ class NotificationsService extends FletService {
       FlutterLocalNotificationsPlugin();
   Completer<bool>? _initCompleter;
   DateTime? _lastShowTime;
+  bool _launchResponseReplayed = false;
 
   @override
   void init() {
@@ -47,26 +70,59 @@ class NotificationsService extends FletService {
       final result = await _plugin.initialize(
         settings: initSettings,
         onDidReceiveNotificationResponse: (response) {
-          final hasAction = response.actionId != null && response.actionId!.isNotEmpty;
-          // Debounce only body taps — Samsung OneUI fires phantom body taps
-          // on show, but action button presses are always intentional.
-          if (!hasAction &&
-              _lastShowTime != null &&
-              DateTime.now().difference(_lastShowTime!).inMilliseconds < 300) {
-            return;
-          }
-          control.triggerEvent("notification_tap", jsonEncode({
-            "payload": response.payload ?? "",
-            "action_id": response.actionId ?? "",
-          }));
+          _emitNotificationResponse(response);
         },
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
-      _initCompleter!.complete(result ?? false);
+      final initialized = result ?? false;
+      _initCompleter!.complete(initialized);
+      if (initialized) {
+        await _replayLaunchNotificationResponse();
+        await _replayBackgroundNotificationResponses();
+      }
     } catch (e) {
       _initCompleter!.complete(false);
     }
 
     return _initCompleter!.future;
+  }
+
+  void _emitNotificationResponse(NotificationResponse response,
+      {bool skipDebounce = false}) {
+    final hasAction = response.actionId != null && response.actionId!.isNotEmpty;
+    // Debounce only body taps. Some Android skins can fire a body tap
+    // immediately after show, while action button presses are intentional.
+    if (!skipDebounce &&
+        !hasAction &&
+        _lastShowTime != null &&
+        DateTime.now().difference(_lastShowTime!).inMilliseconds < 300) {
+      return;
+    }
+    control.triggerEvent("notification_tap", _notificationResponseToJson(response));
+  }
+
+  Future<void> _replayLaunchNotificationResponse() async {
+    if (_launchResponseReplayed) return;
+    _launchResponseReplayed = true;
+
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details == null || !details.didNotificationLaunchApp) return;
+
+    final response = details.notificationResponse;
+    if (response != null) {
+      _emitNotificationResponse(response, skipDebounce: true);
+    }
+  }
+
+  Future<void> _replayBackgroundNotificationResponses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final responses = prefs.getStringList(_backgroundResponsesKey);
+    if (responses == null || responses.isEmpty) return;
+
+    await prefs.remove(_backgroundResponsesKey);
+    for (final responseJson in responses) {
+      control.triggerEvent("notification_tap", responseJson);
+    }
   }
 
   Importance _parseImportance(String value) {
@@ -159,6 +215,14 @@ class NotificationsService extends FletService {
     return Color(int.parse(hex, radix: 16));
   }
 
+  AndroidBitmap<Object>? _parseActionIcon(String? value, String type) {
+    if (value == null) return null;
+    if (type == "file_path") {
+      return FilePathAndroidBitmap(value);
+    }
+    return DrawableResourceAndroidBitmap(value);
+  }
+
   AndroidBitmap<Object>? _parseLargeIcon(String? value, String type) {
     if (value == null) return null;
     if (type == "file_path") {
@@ -220,6 +284,35 @@ class NotificationsService extends FletService {
         return AndroidNotificationCategory.workout;
       default:
         throw ArgumentError('invalid category: $value');
+    }
+  }
+
+  SemanticAction _parseSemanticAction(String value) {
+    switch (value) {
+      case "none":
+        return SemanticAction.none;
+      case "reply":
+        return SemanticAction.reply;
+      case "mark_as_read":
+        return SemanticAction.markAsRead;
+      case "mark_as_unread":
+        return SemanticAction.markAsUnread;
+      case "delete":
+        return SemanticAction.delete;
+      case "archive":
+        return SemanticAction.archive;
+      case "mute":
+        return SemanticAction.mute;
+      case "unmute":
+        return SemanticAction.unmute;
+      case "thumbs_up":
+        return SemanticAction.thumbsUp;
+      case "thumbs_down":
+        return SemanticAction.thumbsDown;
+      case "call":
+        return SemanticAction.call;
+      default:
+        throw ArgumentError('invalid semantic_action: $value');
     }
   }
 
@@ -361,6 +454,7 @@ class NotificationsService extends FletService {
     Int64List? vibrationPattern,
     int? timeoutAfter,
     AndroidNotificationCategory? category,
+    bool fullScreenIntent = false,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -394,18 +488,49 @@ class NotificationsService extends FletService {
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
       category: category,
+      fullScreenIntent: fullScreenIntent,
     );
     return NotificationDetails(android: androidDetails);
   }
 
   List<AndroidNotificationAction> _parseActions(List<dynamic> raw) {
     return raw
-        .map((action) => AndroidNotificationAction(
-              action["id"] as String,
-              action["title"] as String,
-              cancelNotification: action["cancel_notification"] as bool? ?? true,
-              showsUserInterface: action["shows_user_interface"] as bool? ?? true,
-            ))
+        .map((action) {
+          final data = Map<String, dynamic>.from(action as Map);
+          final inputs = ((data["inputs"] as List<dynamic>?) ?? [])
+              .map((input) {
+                final inputData = Map<String, dynamic>.from(input as Map);
+                return AndroidNotificationActionInput(
+                  label: inputData["label"] as String?,
+                  choices: ((inputData["choices"] as List<dynamic>?) ?? [])
+                      .cast<String>(),
+                  allowFreeFormInput:
+                      inputData["allow_free_form_input"] as bool? ?? true,
+                  allowedMimeTypes:
+                      (((inputData["allowed_mime_types"] as List<dynamic>?) ?? [])
+                              .cast<String>())
+                          .toSet(),
+                );
+              })
+              .toList();
+          return AndroidNotificationAction(
+            data["id"] as String,
+            data["title"] as String,
+            titleColor: _parseColor(data["title_color"] as String?),
+            icon: _parseActionIcon(
+                data["icon"] as String?,
+                data["icon_type"] as String? ?? "drawable_resource"),
+            contextual: data["contextual"] as bool? ?? false,
+            showsUserInterface: data["shows_user_interface"] as bool? ?? true,
+            allowGeneratedReplies:
+                data["allow_generated_replies"] as bool? ?? false,
+            inputs: inputs,
+            cancelNotification: data["cancel_notification"] as bool? ?? true,
+            semanticAction:
+                _parseSemanticAction(data["semantic_action"] as String? ?? "none"),
+            invisible: data["invisible"] as bool? ?? false,
+          );
+        })
         .toList();
   }
 
@@ -460,6 +585,7 @@ class NotificationsService extends FletService {
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
             category: _parseCategory(a["category"] as String?),
+            fullScreenIntent: a["full_screen_intent"] as bool? ?? false,
           );
           return "ok";
         case "schedule_notification":
@@ -515,6 +641,7 @@ class NotificationsService extends FletService {
                 : null,
             timeoutAfter: a["timeout_after"] as int?,
             category: _parseCategory(a["category"] as String?),
+            fullScreenIntent: a["full_screen_intent"] as bool? ?? false,
           );
           return "ok";
         case "periodically_show":
@@ -569,7 +696,8 @@ class NotificationsService extends FletService {
             body: a["body"] as String,
             notificationDetails: details,
             repeatInterval: _parseRepeatInterval(a["repeat_interval"] as String),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            androidScheduleMode: _parseAndroidScheduleMode(
+                a["schedule_mode"] as String? ?? "inexact_allow_while_idle"),
             payload: a["payload"] as String,
           );
           return "ok";
@@ -625,7 +753,8 @@ class NotificationsService extends FletService {
             body: a["body"] as String,
             notificationDetails: details,
             repeatDurationInterval: Duration(milliseconds: a["duration_ms"] as int),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            androidScheduleMode: _parseAndroidScheduleMode(
+                a["schedule_mode"] as String? ?? "inexact_allow_while_idle"),
             payload: a["payload"] as String,
           );
           return "ok";
@@ -732,6 +861,92 @@ class NotificationsService extends FletService {
         case "request_exact_alarm_permission":
           final granted = await _requestExactAlarmPermission();
           return granted.toString();
+        case "are_notifications_enabled":
+          await _ensureInitialized();
+          final enabled = await _resolveAndroid().areNotificationsEnabled();
+          return (enabled ?? false).toString();
+        case "can_schedule_exact_notifications":
+          await _ensureInitialized();
+          final can = await _resolveAndroid().canScheduleExactNotifications();
+          return (can ?? false).toString();
+        case "request_full_screen_intent_permission":
+          await _ensureInitialized();
+          final granted =
+              await _resolveAndroid().requestFullScreenIntentPermission();
+          return (granted ?? false).toString();
+        case "has_notification_policy_access":
+          await _ensureInitialized();
+          final has = await _resolveAndroid().hasNotificationPolicyAccess();
+          return (has ?? false).toString();
+        case "request_notification_policy_access":
+          await _ensureInitialized();
+          final access =
+              await _resolveAndroid().requestNotificationPolicyAccess();
+          return (access ?? false).toString();
+        case "create_notification_channel":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          await _resolveAndroid().createNotificationChannel(
+            AndroidNotificationChannel(
+              a["channel_id"] as String,
+              a["channel_name"] as String,
+              description: a["channel_description"] as String?,
+              groupId: a["group_id"] as String?,
+              importance: _parseImportance(a["importance"] as String? ?? "default"),
+              playSound: a["play_sound"] as bool? ?? true,
+              sound: a["sound"] != null
+                  ? RawResourceAndroidNotificationSound(a["sound"] as String)
+                  : null,
+              enableVibration: a["enable_vibration"] as bool? ?? true,
+              vibrationPattern: a["vibration_pattern"] != null
+                  ? Int64List.fromList(
+                      (a["vibration_pattern"] as List<dynamic>).cast<int>())
+                  : null,
+              showBadge: a["show_badge"] as bool? ?? true,
+              bypassDnd: a["channel_bypass_dnd"] as bool? ?? false,
+            ),
+          );
+          return "ok";
+        case "delete_notification_channel":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          await _resolveAndroid()
+              .deleteNotificationChannel(channelId: a["channel_id"] as String);
+          return "ok";
+        case "get_notification_channels":
+          await _ensureInitialized();
+          final channels =
+              await _resolveAndroid().getNotificationChannels() ?? [];
+          final list = channels
+              .map((c) => {
+                    "id": c.id,
+                    "name": c.name,
+                    "description": c.description ?? "",
+                    "importance": c.importance.value,
+                    "play_sound": c.playSound,
+                    "enable_vibration": c.enableVibration,
+                    "bypass_dnd": c.bypassDnd,
+                    "show_badge": c.showBadge,
+                  })
+              .toList();
+          return jsonEncode(list);
+        case "create_notification_channel_group":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          await _resolveAndroid().createNotificationChannelGroup(
+            AndroidNotificationChannelGroup(
+              a["group_id"] as String,
+              a["name"] as String,
+              description: a["description"] as String?,
+            ),
+          );
+          return "ok";
+        case "delete_notification_channel_group":
+          await _ensureInitialized();
+          final a = Map<String, dynamic>.from(args as Map);
+          await _resolveAndroid()
+              .deleteNotificationChannelGroup(groupId: a["group_id"] as String);
+          return "ok";
       }
       throw ArgumentError('unknown method: $name');
     } catch (e) {
@@ -775,6 +990,7 @@ class NotificationsService extends FletService {
     Int64List? vibrationPattern,
     int? timeoutAfter,
     AndroidNotificationCategory? category,
+    bool fullScreenIntent = false,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -814,6 +1030,7 @@ class NotificationsService extends FletService {
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
       category: category,
+      fullScreenIntent: fullScreenIntent,
     );
 
     await _plugin.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
@@ -858,6 +1075,7 @@ class NotificationsService extends FletService {
     Int64List? vibrationPattern,
     int? timeoutAfter,
     AndroidNotificationCategory? category,
+    bool fullScreenIntent = false,
   }) async {
     final initialized = await _ensureInitialized();
     if (!initialized) {
@@ -901,6 +1119,7 @@ class NotificationsService extends FletService {
       vibrationPattern: vibrationPattern,
       timeoutAfter: timeoutAfter,
       category: category,
+      fullScreenIntent: fullScreenIntent,
     );
 
     await _plugin.zonedSchedule(
@@ -913,6 +1132,15 @@ class NotificationsService extends FletService {
       payload: payload,
       matchDateTimeComponents: matchDateTimeComponents,
     );
+  }
+
+  AndroidFlutterLocalNotificationsPlugin _resolveAndroid() {
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) {
+      throw Exception('Android platform not available');
+    }
+    return android;
   }
 
   Future<bool> _requestPermissions() async {

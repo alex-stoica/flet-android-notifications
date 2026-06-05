@@ -1,8 +1,8 @@
 # flet-android-notifications
 
-Native Android notifications for Flet apps. Bridges Python to the `flutter_local_notifications` plugin through a custom Flet extension.
+Native Android notifications for Flet apps — a Flet extension bridging Python to the `flutter_local_notifications` plugin.
 
-Flet has no built-in notification support, and Python-side approaches (plyer, Pyjnius) fail because Flet's Python process is sandboxed from Android APIs.
+Flet has no built-in notifications, and Python-side approaches (plyer, Pyjnius) fail because Flet's Python process is sandboxed from Android APIs.
 
 <p align="center">
   <img src="docs/screenshots/style-showcase.png" width="45%" alt="Demo notifications: actions, progress, BigText, large icon, BigPicture" />
@@ -10,7 +10,7 @@ Flet has no built-in notification support, and Python-side approaches (plyer, Py
   <img src="docs/screenshots/colorized-foreground-service.png" width="45%" alt="Foreground service with red colorized background on Samsung OneUI, plus secret/sub-text/vibration variants" />
 </p>
 
-*Left: action buttons, determinate progress, BigTextStyle, large icon thumbnail, BigPictureStyle. Right: indeterminate progress, scheduled secret, sub-text header, only-alert-once, custom vibration, and a foreground service with `colorized=True` (full red background — verified on Samsung OneUI). All from the demo app in `main.py`.*
+*Left: action buttons, determinate progress, BigTextStyle, large icon thumbnail, BigPictureStyle. Right: indeterminate progress, scheduled secret, sub-text header, only-alert-once, custom vibration, and a foreground service with `colorized=True` (full red background observed on one Samsung OneUI device). All from the demo app in `main.py`.*
 
 ## Install
 
@@ -18,7 +18,7 @@ Flet has no built-in notification support, and Python-side approaches (plyer, Py
 pip install flet-android-notifications
 ```
 
-For a normal app, add only the PyPI dependency and Android permissions to your `pyproject.toml`:
+For a normal app, add the PyPI dependency and Android permissions to your `pyproject.toml`:
 
 ```toml
 [project]
@@ -30,6 +30,14 @@ dependencies = ["flet>=0.82.0", "flet-android-notifications"]
 "android.permission.RECEIVE_BOOT_COMPLETED" = true     # survive reboots
 ```
 
+After `flet build apk` generates `build/flutter`, run the package patcher once per clean build directory:
+
+```bash
+flet-android-notifications-patch --project-root build/flutter
+```
+
+The patcher adds the `flutter_local_notifications` receivers/service plus Gradle desugaring/multidex required by scheduled notifications, action callbacks, and foreground services.
+
 Do **not** copy the demo app's local-development settings into your app:
 
 ```toml
@@ -40,7 +48,7 @@ exclude = ["flet_android_notifications"]
 flet-android-notifications = "flet_android_notifications"
 ```
 
-Those settings are only for building this repository's demo app against the local checkout. In a normal app installed from PyPI, `tool.flet.dev_packages` makes `flet build apk` pass `flet-android-notifications @ flet_android_notifications` to pip. If your app does not contain a local `flet_android_notifications` directory, pip rejects it as an invalid URL.
+Those are only for building this repo's demo against the local checkout. In a PyPI-installed app, `tool.flet.dev_packages` makes `flet build apk` pass `flet-android-notifications @ flet_android_notifications` to pip, which pip rejects as an invalid URL when no local `flet_android_notifications` directory exists.
 
 ## Quick start
 
@@ -89,12 +97,33 @@ See [`examples/`](examples/) for more: [simple](examples/simple.py), [action but
 | `get_active_notifications()` | `list[dict]` — currently displayed (id, title, body, channel_id, payload) |
 | `get_pending_notifications()` | `list[dict]` — scheduled/periodic (id, title, body, payload) |
 
-### Permission methods
+### Permission & status methods
 
 | Method | Returns |
 |---|---|
-| `request_permissions()` | `bool` — POST_NOTIFICATIONS (Android 13+) |
-| `request_exact_alarm_permission()` | `bool` — SCHEDULE_EXACT_ALARM (Android 14+) |
+| `request_permissions()` | `bool` — request POST_NOTIFICATIONS (Android 13+) |
+| `request_exact_alarm_permission()` | `bool` — request SCHEDULE_EXACT_ALARM (Android 14+) |
+| `request_full_screen_intent_permission()` | `bool` — request USE_FULL_SCREEN_INTENT (Android 14+) |
+| `are_notifications_enabled()` | `bool` — are notifications enabled for the app |
+| `can_schedule_exact_notifications()` | `bool` — may the app schedule exact alarms |
+| `has_notification_policy_access()` | `bool` — has do-not-disturb policy access (gates `channel_bypass_dnd`) |
+| `request_notification_policy_access()` | opens the system DND-access screen; confirm afterwards with `has_notification_policy_access()` |
+
+Use the status checks (`are_notifications_enabled`, `can_schedule_exact_notifications`,
+`has_notification_policy_access`) to tell *why* a notification didn't appear instead of guessing.
+
+### Channel management methods
+
+Channel sound/vibration/importance are immutable after creation — delete and recreate a channel to
+change them.
+
+| Method | Description |
+|---|---|
+| `create_notification_channel(channel_id, channel_name, ...)` | create/configure a channel up front (sound, importance, vibration, bypass_dnd, group_id, …) |
+| `delete_notification_channel(channel_id)` | delete a channel (so it can be recreated with new settings) |
+| `get_notification_channels()` | `list[dict]` — id, name, description, importance, play_sound, enable_vibration, bypass_dnd, show_badge |
+| `create_notification_channel_group(group_id, name, ...)` | create a channel group |
+| `delete_notification_channel_group(group_id)` | delete a channel group and its channels |
 
 ### Tap callback
 
@@ -107,7 +136,36 @@ def on_tap(e):
 notifications = FletAndroidNotifications(on_notification_tap=on_tap)
 ```
 
-`action_id` is `""` when the body is tapped (not an action button).
+`action_id` is `""` when the body is tapped (not an action button). Inline reply text is returned as `data["input"]`.
+
+### Rich Android actions
+
+```python
+from flet_android_notifications import NotificationAction, NotificationActionInput
+
+await notifications.show_notification(
+    notification_id=10,
+    title="Message",
+    body="Reply from the notification shade.",
+    actions=[
+        NotificationAction(
+            "reply",
+            "Reply",
+            semantic_action="reply",
+            allow_generated_replies=True,
+            inputs=[NotificationActionInput(label="Type a reply")],
+        ),
+        NotificationAction(
+            "archive",
+            "Archive",
+            semantic_action="archive",
+            shows_user_interface=False,
+        ),
+    ],
+)
+```
+
+Existing dict actions still work. `NotificationAction` additionally supports `title_color`, `icon`, `icon_type`, `contextual`, `allow_generated_replies`, `inputs`, `semantic_action`, and `invisible`. Android requires contextual actions to include a valid icon. Visual rendering of some action details is OEM-dependent, so verify on target devices.
 
 ---
 
@@ -130,17 +188,18 @@ notifications = FletAndroidNotifications(on_notification_tap=on_tap)
 
 ### Common optional parameters
 
-These work on all four methods above.
+These work on all four methods above (exceptions are noted in the Description column).
 
 **Basics:**
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `payload` | `str` | `""` | returned in tap callback |
-| `actions` | `list[dict]` | `None` | buttons: `[{"id": "...", "title": "..."}]` |
+| `actions` | `list[NotificationAction\|dict]` | `None` | action buttons and optional inline reply inputs |
 | `importance` | `str` | `"high"` | `none`, `min`, `low`, `default`, `high`, `max` |
 | `timeout_after` | `int\|None` | `None` | auto-dismiss after N milliseconds |
 | `category` | `str\|None` | `None` | notification type hint for DND filtering |
+| `full_screen_intent` | `bool` | `False` | launch a full-screen / high-priority heads-up UI. **`show_notification` and `schedule_notification` only.** Needs `USE_FULL_SCREEN_INTENT` (Android 14+, see `request_full_screen_intent_permission()`) |
 
 **Channel:**
 
@@ -150,6 +209,11 @@ These work on all four methods above.
 | `channel_name` | `str` | `"Flet Notifications"` |
 | `channel_description` | `str` | `"Notifications from Flet app"` |
 | `channel_bypass_dnd` | `bool` | `False` |
+
+`channel_bypass_dnd` only takes effect when the app has do-not-disturb policy access — check with
+`has_notification_policy_access()` and request it via `request_notification_policy_access()`. A
+channel's sound/importance/vibration are fixed at creation; use the channel-management methods to
+configure or replace a channel (see below).
 
 **Appearance:**
 
@@ -194,14 +258,16 @@ These work on all four methods above.
 | `set_as_group_summary` | `bool` | `False` | this is the group summary |
 | `group_alert_behavior` | `str` | `"all"` | `"all"`, `"summary"`, `"children"` |
 
-### Schedule-only parameters
+### Scheduling parameters
 
-These only apply to `schedule_notification`:
+| Parameter | Applies to | Type | Default | Description |
+|---|---|---|---|---|
+| `schedule_mode` | `schedule_notification`, `periodically_show`, `periodically_show_with_duration` | `str` | `"inexact_allow_while_idle"` | see modes below |
+| `match_date_time_components` | `schedule_notification` only | `str\|None` | `None` | `"time"` (daily), `"day_of_week_and_time"` (weekly), `"day_of_month_and_time"` (monthly), `"date_and_time"` (yearly) |
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `schedule_mode` | `str` | `"inexact_allow_while_idle"` | see table below |
-| `match_date_time_components` | `str\|None` | `None` | `"time"` (daily), `"day_of_week_and_time"` (weekly), `"day_of_month_and_time"` (monthly), `"date_and_time"` (yearly) |
+`schedule_mode` lets the periodic methods choose an exact mode too (previously they were hardcoded
+to `inexact_allow_while_idle`). Exact modes require `SCHEDULE_EXACT_ALARM` — check first with
+`can_schedule_exact_notifications()`, otherwise the OS rejects them with `exact_alarms_not_permitted`.
 
 **Schedule modes:**
 
@@ -248,6 +314,8 @@ All other notification parameters (channel, appearance, behavior, etc.) are the 
 
 **AndroidManifest.xml** — add inside `<application>`:
 
+The package patcher can add this entry automatically.
+
 ```xml
 <service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
     android:exported="false"
@@ -285,19 +353,18 @@ style=InboxStyle(["Line 1", "Line 2", "Line 3"], summary_text="3 items")
 # first build — generates Flutter template, may fail at Gradle
 flet build apk -v
 
-# patch desugaring into build/flutter/android/app/build.gradle.kts:
-#   android { compileOptions { isCoreLibraryDesugaringEnabled = true } }
-#   dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }
+# patch AndroidManifest.xml receivers/services and Gradle desugaring:
+flet-android-notifications-patch --project-root build/flutter
 
 # rebuild
 flet build apk -v
 ```
 
-The desugaring patch is needed because `flutter_local_notifications` v19+ uses Java 8 APIs. Apply once per clean build directory.
+Needed because `flutter_local_notifications` v19+ uses Java 8 APIs, and action/scheduling/foreground-service support requires app-level manifest entries. Apply once per clean build directory.
 
-### AndroidManifest.xml for scheduled notifications
+### AndroidManifest.xml entries
 
-Register BroadcastReceivers inside `<application>` in `build/flutter/android/app/src/main/AndroidManifest.xml`. **Required for `schedule_notification`, `periodically_show`, and `periodically_show_with_duration` to fire at all** (not just for surviving reboots — without these, AlarmManager fires but has no listener and the notification is silently dropped):
+Register BroadcastReceivers inside `<application>` in `build/flutter/android/app/src/main/AndroidManifest.xml`. **Required for `schedule_notification` and the `periodically_show*` methods to fire at all** — not just for reboots: without them AlarmManager fires but has no listener and the notification is silently dropped.
 
 ```xml
 <receiver android:exported="false"
@@ -311,6 +378,11 @@ Register BroadcastReceivers inside `<application>` in `build/flutter/android/app
         <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
     </intent-filter>
 </receiver>
+<receiver android:exported="false"
+    android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+<service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+    android:exported="false"
+    android:foregroundServiceType="specialUse" />
 ```
 
 ### Installing on device
@@ -337,21 +409,22 @@ Add `res/raw/keep.xml` to prevent resource stripping:
     tools:keep="@raw/*,@drawable/ic_*" />
 ```
 
-Sound is permanently bound to a channel at creation. Change the sound by using a different `channel_id`.
+A channel's sound is fixed at creation. Change it with a new `channel_id`, or
+`delete_notification_channel(id)` then `create_notification_channel(id, ..., sound=...)` to reuse
+the same id.
 
-## Samsung OneUI notes
+## OEM rendering notes
 
-- **`color` on regular notifications**: the value reaches the OS (verified via `dumpsys
-  notification`) but Samsung Brief mode does not render any visible tint on the small icon. Two
-  notifications, one with `color="#FF0000"` and one without, look identical in the shade. Renders
-  visibly on AOSP/Pixel.
-- **`colorized` on regular notifications**: silently ignored everywhere. Per Android contract,
-  this flag only takes effect on foreground service / media-style notifications.
-- **`colorized` on `start_foreground_service`**: works correctly on Samsung OneUI. The full
-  notification background renders in the requested color (verified on OneUI Brief mode). See
-  button 23 in the demo `main.py`.
-- **Bottom line for Samsung**: if you need a visibly colored notification, use
-  `start_foreground_service(color=..., colorized=True)`. Regular notifications won't show color.
+- **`color` on regular notifications**: reaches the OS but may not render visibly on every skin.
+  Verify per device before relying on it.
+- **`colorized` on regular notifications**: silently ignored everywhere — per Android contract it
+  only applies to foreground-service / media-style notifications.
+- **`colorized` on `start_foreground_service`**: observed working on one Samsung OneUI device
+  (demo button 23).
+- **Bottom line**: if visible color matters, test both regular and foreground-service colorized
+  notifications on your target devices.
+- **On-device audit**: every demo button was verified on a Galaxy S25 (One UI, Android 16) — see
+  `docs/button-tests/README.md` and `docs/samsung-claims-audit.md` for per-feature evidence.
 
 ## Limitations
 

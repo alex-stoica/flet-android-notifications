@@ -14,6 +14,8 @@ from flet_android_notifications import (
     InboxStyle,
     BigPictureStyle,
     BigTextStyle,
+    NotificationAction,
+    NotificationActionInput,
 )
 
 
@@ -288,6 +290,45 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL actions: {type(ex).__name__}: {ex}")
 
+    # -- 12b. rich action schema with inline reply --
+    async def send_rich_actions(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="RICH ACTIONS #12b",
+                body="Reply inline or archive from the notification.",
+                payload=f"rich_payload_for_{nid}",
+                actions=[
+                    NotificationAction(
+                        "reply",
+                        "Reply",
+                        title_color="#00897B",
+                        semantic_action="reply",
+                        allow_generated_replies=True,
+                        inputs=[
+                            NotificationActionInput(
+                                label="Type a reply",
+                                choices=["OK", "Later"],
+                            )
+                        ],
+                    ),
+                    NotificationAction(
+                        "archive",
+                        "Archive",
+                        icon="ic_notification",
+                        title_color="#C62828",
+                        semantic_action="archive",
+                        contextual=True,
+                        shows_user_interface=False,
+                    ),
+                ],
+                icon="ic_notification",
+            )
+            set_log(f"OK rich actions #12b (id={nid}) - expand shade and reply")
+        except Exception as ex:
+            set_log(f"FAIL rich actions: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+
     # -- 13. sub text --
     async def send_sub_text(e):
         try:
@@ -508,6 +549,98 @@ def main(page: ft.Page):
         await notifications.cancel_all()
         set_log("all cancelled")
 
+    # -- 24. permission / status checks (Phase B) --
+    async def check_status(e):
+        try:
+            notif_enabled = await notifications.are_notifications_enabled()
+            can_exact = await notifications.can_schedule_exact_notifications()
+            dnd_access = await notifications.has_notification_policy_access()
+            set_log(
+                f"notifications_enabled={notif_enabled}, can_schedule_exact={can_exact}, "
+                f"dnd_policy_access={dnd_access}"
+            )
+        except Exception as ex:
+            set_log(f"FAIL status: {type(ex).__name__}: {ex}")
+
+    async def request_dnd_access(e):
+        try:
+            result = await notifications.request_notification_policy_access()
+            has_access = await notifications.has_notification_policy_access()
+            set_log(f"requested DND access (plugin result={result}, has_access now={has_access})")
+        except Exception as ex:
+            set_log(f"FAIL dnd access: {type(ex).__name__}: {ex}")
+
+    # -- 25. full-screen intent (Phase B) --
+    async def send_full_screen(e):
+        try:
+            granted = await notifications.request_full_screen_intent_permission()
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="FULL SCREEN #25",
+                body=f"Full-screen intent notification. permission granted={granted}",
+                full_screen_intent=True,
+                importance="max",
+                category="call",
+                icon="ic_notification",
+            )
+            set_log(f"OK full screen #25 (id={nid}) perm={granted}")
+        except Exception as ex:
+            set_log(f"FAIL full screen: {type(ex).__name__}: {ex}")
+
+    # -- 26. channel management (Phase B) --
+    async def manage_channels(e):
+        try:
+            await notifications.create_notification_channel(
+                "demo_managed_ch",
+                "Demo Managed",
+                channel_description="created at runtime",
+                importance="high",
+                sound="test_beep",
+            )
+            channels = await notifications.get_notification_channels()
+            ids = [c["id"] for c in channels]
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="CHANNEL MGMT #26",
+                body=f"Created demo_managed_ch. {len(channels)} channels total.",
+                channel_id="demo_managed_ch",
+                icon="ic_notification",
+            )
+            set_log(f"OK channels #26: {len(channels)} channels: {ids}")
+        except Exception as ex:
+            set_log(f"FAIL channels: {type(ex).__name__}: {ex}")
+
+    async def delete_managed_channel(e):
+        try:
+            await notifications.delete_notification_channel("demo_managed_ch")
+            set_log("deleted demo_managed_ch")
+        except Exception as ex:
+            set_log(f"FAIL delete channel: {type(ex).__name__}: {ex}")
+
+    # -- 27. periodic with exact schedule_mode (Phase B) --
+    async def send_periodic_exact(e):
+        try:
+            nid = next_id()
+            await notifications.show_notification(
+                notification_id=nid,
+                title="PERIODIC EXACT #27 (kickoff)",
+                body="Periodic with exact schedule_mode. Next in ~1 min.",
+                icon="ic_notification",
+            )
+            await notifications.periodically_show(
+                notification_id=nid,
+                title="PERIODIC EXACT #27",
+                body="Repeats every minute (exact_allow_while_idle).",
+                repeat_interval="every_minute",
+                schedule_mode="exact_allow_while_idle",
+                icon="ic_notification",
+            )
+            set_log(f"OK periodic exact #27 (id={nid})")
+        except Exception as ex:
+            set_log(f"FAIL periodic exact: {type(ex).__name__}: {ex}")
+
     def hint(text):
         return ft.Text(text, size=10, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
 
@@ -520,8 +653,8 @@ def main(page: ft.Page):
                 ft.Button(content="1. Baseline (no new params)", on_click=send_baseline),
                 ft.Divider(height=1),
                 ft.Button(content="2. Colored (pure red)", on_click=send_colored),
-                hint("color reaches the OS but Samsung Brief mode renders NO visible tint.\n"
-                     "for visibly colored notifications on Samsung, use button 23 instead."),
+                hint("OEM skins vary: compare shade screenshots before treating color as supported.\n"
+                     "foreground service colorized mode is tested separately in button 23."),
                 ft.Divider(height=1),
                 ft.Button(content="3. Group (3 + summary)", on_click=send_group),
                 hint("should see collapsed group with InboxStyle summary.\n"
@@ -559,12 +692,16 @@ def main(page: ft.Page):
                      "notification is ongoing (can't swipe away)."),
                 ft.Divider(height=1),
                 ft.Button(content="11. Ongoing (sticky)", on_click=send_ongoing),
-                hint("can't be swiped away. use 'cancel all' to remove.\n"
-                     "Samsung OneUI may allow swipe — that's a known OEM quirk."),
+                hint("can't normally be swiped away. use 'cancel all' to remove.\n"
+                     "verify on this device because OEM notification behavior varies."),
                 ft.Divider(height=1),
                 ft.Button(content="12. Action buttons", on_click=send_actions),
                 hint("shows Approve / Deny buttons.\n"
                      "tap one — check log for tap event data."),
+                ft.Divider(height=1),
+                ft.Button(content="12b. Rich actions + inline reply", on_click=send_rich_actions),
+                hint("uses typed NotificationAction + NotificationActionInput.\n"
+                     "reply text should appear as input in the log; action title color is OEM-dependent."),
                 ft.Divider(height=1),
                 ft.Button(content="13. Sub text", on_click=send_sub_text),
                 hint("look for 'HELLO-SUB-TEXT' in notification header\n"
@@ -611,6 +748,25 @@ def main(page: ft.Page):
                 hint("starts foreground service with FULL RED background (colorized).\n"
                      "persistent notification, can't be swiped away."),
                 ft.Button(content="23. Foreground service (stop)", on_click=stop_foreground),
+                ft.Divider(),
+                ft.Text("--- Phase B: new features ---", size=11, color=ft.Colors.BLUE_400),
+                ft.Button(content="24. Check status (perms/exact/dnd)", on_click=check_status),
+                ft.Button(content="24b. Request DND policy access", on_click=request_dnd_access),
+                hint("are_notifications_enabled + can_schedule_exact_notifications +\n"
+                     "has_notification_policy_access. dnd access gates channel_bypass_dnd."),
+                ft.Divider(height=1),
+                ft.Button(content="25. Full-screen intent", on_click=send_full_screen),
+                hint("requests USE_FULL_SCREEN_INTENT then fires a max-importance\n"
+                     "full_screen_intent notification (heads-up / full-screen UI)."),
+                ft.Divider(height=1),
+                ft.Button(content="26. Channel mgmt (create+list)", on_click=manage_channels),
+                ft.Button(content="26. Delete managed channel", on_click=delete_managed_channel),
+                hint("create_notification_channel + get_notification_channels +\n"
+                     "delete_notification_channel. Lets you change an immutable channel's sound."),
+                ft.Divider(height=1),
+                ft.Button(content="27. Periodic (exact mode)", on_click=send_periodic_exact),
+                hint("periodically_show with schedule_mode='exact_allow_while_idle'\n"
+                     "(needs SCHEDULE_EXACT_ALARM; check with button 24)."),
                 ft.Divider(),
                 ft.Button(content="Cancel all", on_click=cancel_all),
             ],

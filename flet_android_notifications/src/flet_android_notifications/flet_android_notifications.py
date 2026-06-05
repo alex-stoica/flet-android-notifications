@@ -113,6 +113,90 @@ class InboxStyle:
 NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
 
 
+class NotificationActionInput:
+    """Inline input collected from a notification action."""
+
+    def __init__(
+        self,
+        *,
+        label: Optional[str] = None,
+        choices: Optional[list[str]] = None,
+        allow_free_form_input: bool = True,
+        allowed_mime_types: Optional[list[str]] = None,
+    ):
+        self.label = label
+        self.choices = choices or []
+        self.allow_free_form_input = allow_free_form_input
+        self.allowed_mime_types = allowed_mime_types or []
+
+    def to_dict(self) -> dict:
+        return {
+            "label": self.label,
+            "choices": self.choices,
+            "allow_free_form_input": self.allow_free_form_input,
+            "allowed_mime_types": self.allowed_mime_types,
+        }
+
+
+class NotificationAction:
+    """Android notification action button.
+
+    Existing dict actions are still supported. This class exists to make richer
+    Android action features discoverable and validated from Python.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        *,
+        cancel_notification: bool = True,
+        shows_user_interface: bool = True,
+        title_color: Optional[str] = None,
+        icon: Optional[str] = None,
+        icon_type: str = "drawable_resource",
+        contextual: bool = False,
+        allow_generated_replies: bool = False,
+        inputs: Optional[list[Union[NotificationActionInput, dict]]] = None,
+        semantic_action: str = "none",
+        invisible: bool = False,
+    ):
+        self.id = id
+        self.title = title
+        self.cancel_notification = cancel_notification
+        self.shows_user_interface = shows_user_interface
+        self.title_color = title_color
+        self.icon = icon
+        self.icon_type = icon_type
+        self.contextual = contextual
+        self.allow_generated_replies = allow_generated_replies
+        self.inputs = inputs or []
+        self.semantic_action = semantic_action
+        self.invisible = invisible
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "cancel_notification": self.cancel_notification,
+            "shows_user_interface": self.shows_user_interface,
+            "title_color": self.title_color,
+            "icon": self.icon,
+            "icon_type": self.icon_type,
+            "contextual": self.contextual,
+            "allow_generated_replies": self.allow_generated_replies,
+            "inputs": [
+                input_.to_dict() if hasattr(input_, "to_dict") else dict(input_)
+                for input_ in self.inputs
+            ],
+            "semantic_action": self.semantic_action,
+            "invisible": self.invisible,
+        }
+
+
+NotificationActionLike = Union[NotificationAction, dict]
+
+
 _VALID_VISIBILITIES = {"public", "private", "secret"}
 
 _VALID_IMPORTANCES = {"none", "min", "low", "default", "high", "max"}
@@ -128,6 +212,13 @@ _VALID_REPEAT_INTERVALS = {"every_minute", "hourly", "daily", "weekly"}
 _VALID_MATCH_COMPONENTS = {"time", "day_of_week_and_time", "day_of_month_and_time", "date_and_time"}
 
 _VALID_LARGE_ICON_TYPES = {"drawable_resource", "file_path"}
+
+_VALID_ACTION_ICON_TYPES = {"drawable_resource", "file_path"}
+
+_VALID_SEMANTIC_ACTIONS = {
+    "none", "reply", "mark_as_read", "mark_as_unread", "delete", "archive",
+    "mute", "unmute", "thumbs_up", "thumbs_down", "call",
+}
 
 _VALID_START_TYPES = {
     "start_sticky", "start_not_sticky", "start_sticky_compatibility", "start_redeliver_intent",
@@ -169,6 +260,66 @@ def _validate_color_hex(color: str) -> None:
         raise ValueError(f"color contains invalid hex characters: {color!r}")
 
 
+def _normalize_action_input(input_: Union[NotificationActionInput, dict]) -> dict:
+    if isinstance(input_, NotificationActionInput):
+        data = input_.to_dict()
+    elif isinstance(input_, dict):
+        data = dict(input_)
+    else:
+        raise TypeError(f"action input must be NotificationActionInput or dict, got {type(input_).__name__}")
+
+    data.setdefault("choices", [])
+    data.setdefault("allow_free_form_input", True)
+    data.setdefault("label", None)
+    data.setdefault("allowed_mime_types", [])
+    if not isinstance(data["choices"], list) or not all(isinstance(v, str) for v in data["choices"]):
+        raise ValueError("action input choices must be a list of strings")
+    if not isinstance(data["allowed_mime_types"], list) or not all(
+        isinstance(v, str) for v in data["allowed_mime_types"]
+    ):
+        raise ValueError("action input allowed_mime_types must be a list of strings")
+    return data
+
+
+def _normalize_action(action: NotificationActionLike) -> dict:
+    if isinstance(action, NotificationAction):
+        data = action.to_dict()
+    elif isinstance(action, dict):
+        data = dict(action)
+    else:
+        raise TypeError(f"action must be NotificationAction or dict, got {type(action).__name__}")
+
+    if not isinstance(data.get("id"), str) or not data["id"]:
+        raise ValueError("action id must be a non-empty string")
+    if not isinstance(data.get("title"), str) or not data["title"]:
+        raise ValueError("action title must be a non-empty string")
+
+    data.setdefault("cancel_notification", True)
+    data.setdefault("shows_user_interface", True)
+    data.setdefault("title_color", None)
+    data.setdefault("icon", None)
+    data.setdefault("icon_type", "drawable_resource")
+    data.setdefault("contextual", False)
+    data.setdefault("allow_generated_replies", False)
+    data.setdefault("inputs", [])
+    data.setdefault("semantic_action", "none")
+    data.setdefault("invisible", False)
+
+    if data["title_color"] is not None:
+        _validate_color_hex(data["title_color"])
+    if data["icon"] is not None:
+        _validate_enum(data["icon_type"], _VALID_ACTION_ICON_TYPES, "action icon_type")
+    if data["contextual"] and data["icon"] is None:
+        raise ValueError("contextual notification actions require an icon")
+    _validate_enum(data["semantic_action"], _VALID_SEMANTIC_ACTIONS, "semantic_action")
+    data["inputs"] = [_normalize_action_input(input_) for input_ in data["inputs"]]
+    return data
+
+
+def _normalize_actions(actions: Optional[list[NotificationActionLike]]) -> list[dict]:
+    return [_normalize_action(action) for action in actions or []]
+
+
 @ft.control("flet_android_notifications")
 class FletAndroidNotifications(ft.Service):
     on_notification_tap: Optional[ft.ControlEventHandler["FletAndroidNotifications"]] = None
@@ -186,7 +337,7 @@ class FletAndroidNotifications(ft.Service):
         body: str,
         *,
         payload: str = "",
-        actions: Optional[list[dict]] = None,
+        actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
         channel_description: str = "Notifications from Flet app",
@@ -217,6 +368,7 @@ class FletAndroidNotifications(ft.Service):
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
         category: Optional[str] = None,
+        full_screen_intent: bool = False,
     ):
         """Show an Android notification.
 
@@ -225,14 +377,13 @@ class FletAndroidNotifications(ft.Service):
             title: Notification title.
             body: Notification body text.
             payload: Arbitrary string returned in on_notification_tap event.
-            actions: List of action buttons shown on the notification. Each is
-                a dict with "id" and "title" keys, plus optional
-                "cancel_notification" (bool, default True) and
-                "shows_user_interface" (bool, default True). Example:
-                [{"id": "approve", "title": "Approve"},
-                 {"id": "snooze", "title": "Snooze", "cancel_notification": False}].
+            actions: List of NotificationAction objects or compatible dicts.
+                Dicts must include "id" and "title". Rich Android action
+                fields include inputs, title_color, icon, contextual,
+                allow_generated_replies, semantic_action, and invisible.
                 The tapped action's id is returned as "action_id" in the
-                on_notification_tap event data (JSON string).
+                on_notification_tap event data (JSON string). Inline reply
+                text is returned as "input".
             channel_id: Android notification channel ID.
             channel_name: Human-readable channel name (shown in system settings).
             channel_description: Channel description (shown in system settings).
@@ -312,7 +463,7 @@ class FletAndroidNotifications(ft.Service):
                 "title": title,
                 "body": body,
                 "payload": payload,
-                "actions": actions or [],
+                "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,
                 "channel_description": channel_description,
@@ -343,6 +494,7 @@ class FletAndroidNotifications(ft.Service):
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
                 "category": category,
+                "full_screen_intent": full_screen_intent,
             },
         )
         return self._check_error(result)
@@ -355,7 +507,7 @@ class FletAndroidNotifications(ft.Service):
         scheduled_time: datetime,
         *,
         payload: str = "",
-        actions: Optional[list[dict]] = None,
+        actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
         channel_description: str = "Notifications from Flet app",
@@ -388,6 +540,7 @@ class FletAndroidNotifications(ft.Service):
         vibration_pattern: Optional[list[int]] = None,
         timeout_after: Optional[int] = None,
         category: Optional[str] = None,
+        full_screen_intent: bool = False,
     ):
         """Schedule an Android notification for a future time.
 
@@ -402,9 +555,7 @@ class FletAndroidNotifications(ft.Service):
             scheduled_time: When to fire. If naive (no tzinfo), treated as
                 local time. If timezone-aware, converted to UTC internally.
             payload: Arbitrary string returned in on_notification_tap event.
-            actions: List of action buttons, each {"id": "...", "title": "..."}.
-                Optional keys: "cancel_notification" (bool, default True),
-                "shows_user_interface" (bool, default True).
+            actions: List of NotificationAction objects or compatible dicts.
             channel_id: Android notification channel ID.
             channel_name: Human-readable channel name.
             channel_description: Channel description.
@@ -497,7 +648,7 @@ class FletAndroidNotifications(ft.Service):
                 "body": body,
                 "scheduled_epoch_ms": epoch_ms,
                 "payload": payload,
-                "actions": actions or [],
+                "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,
                 "channel_description": channel_description,
@@ -530,6 +681,7 @@ class FletAndroidNotifications(ft.Service):
                 "vibration_pattern": vibration_pattern,
                 "timeout_after": timeout_after,
                 "category": category,
+                "full_screen_intent": full_screen_intent,
             },
         )
         return self._check_error(result)
@@ -541,8 +693,9 @@ class FletAndroidNotifications(ft.Service):
         body: str,
         repeat_interval: str,
         *,
+        schedule_mode: str = "inexact_allow_while_idle",
         payload: str = "",
-        actions: Optional[list[dict]] = None,
+        actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
         channel_description: str = "Notifications from Flet app",
@@ -591,6 +744,7 @@ class FletAndroidNotifications(ft.Service):
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_enum(repeat_interval, _VALID_REPEAT_INTERVALS, "repeat_interval")
+        _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
         if large_icon is not None:
             _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
         if color is not None:
@@ -606,8 +760,9 @@ class FletAndroidNotifications(ft.Service):
                 "title": title,
                 "body": body,
                 "repeat_interval": repeat_interval,
+                "schedule_mode": schedule_mode,
                 "payload": payload,
-                "actions": actions or [],
+                "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,
                 "channel_description": channel_description,
@@ -649,8 +804,9 @@ class FletAndroidNotifications(ft.Service):
         body: str,
         duration_seconds: Union[int, float],
         *,
+        schedule_mode: str = "inexact_allow_while_idle",
         payload: str = "",
-        actions: Optional[list[dict]] = None,
+        actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
         channel_description: str = "Notifications from Flet app",
@@ -706,6 +862,7 @@ class FletAndroidNotifications(ft.Service):
             _validate_visibility(visibility)
         if category is not None:
             _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
         result = await self._invoke_method(
             method_name="periodically_show_with_duration",
             arguments={
@@ -713,8 +870,9 @@ class FletAndroidNotifications(ft.Service):
                 "title": title,
                 "body": body,
                 "duration_ms": int(duration_seconds * 1000),
+                "schedule_mode": schedule_mode,
                 "payload": payload,
-                "actions": actions or [],
+                "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,
                 "channel_description": channel_description,
@@ -758,7 +916,7 @@ class FletAndroidNotifications(ft.Service):
         payload: str = "",
         start_type: str = "start_sticky",
         foreground_service_types: Optional[list[str]] = None,
-        actions: Optional[list[dict]] = None,
+        actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
         channel_description: str = "Notifications from Flet app",
@@ -840,7 +998,7 @@ class FletAndroidNotifications(ft.Service):
                 "payload": payload,
                 "start_type": start_type,
                 "foreground_service_types": foreground_service_types,
-                "actions": actions or [],
+                "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,
                 "channel_description": channel_description,
@@ -975,3 +1133,186 @@ class FletAndroidNotifications(ft.Service):
             method_name="request_exact_alarm_permission",
         )
         return self._check_error(result) == "true"
+
+    async def are_notifications_enabled(self) -> bool:
+        """Whether notifications are enabled for this app (POST_NOTIFICATIONS).
+
+        Use this instead of assuming a notification was suppressed by the OEM —
+        if this returns False, the user has notifications turned off.
+
+        Returns:
+            bool: True if notifications are enabled.
+        """
+        result = await self._invoke_method(method_name="are_notifications_enabled")
+        return self._check_error(result) == "true"
+
+    async def can_schedule_exact_notifications(self) -> bool:
+        """Whether the app may schedule exact alarms (SCHEDULE_EXACT_ALARM).
+
+        Exact schedule modes ("alarm_clock", "exact", "exact_allow_while_idle")
+        require this. If False, call request_exact_alarm_permission() or fall
+        back to an inexact schedule_mode.
+
+        Returns:
+            bool: True if exact alarms can be scheduled.
+        """
+        result = await self._invoke_method(method_name="can_schedule_exact_notifications")
+        return self._check_error(result) == "true"
+
+    async def request_full_screen_intent_permission(self) -> bool:
+        """Request the USE_FULL_SCREEN_INTENT permission (Android 14+).
+
+        Required for full_screen_intent notifications to launch their
+        full-screen UI on Android 14+. The USE_FULL_SCREEN_INTENT permission
+        must also be declared in the app manifest.
+
+        Returns:
+            bool: True if granted.
+        """
+        result = await self._invoke_method(method_name="request_full_screen_intent_permission")
+        return self._check_error(result) == "true"
+
+    async def has_notification_policy_access(self) -> bool:
+        """Whether the app has notification-policy (do-not-disturb) access.
+
+        A channel's channel_bypass_dnd only takes effect when this is True;
+        without policy access Android treats bypass as False. Use this to tell
+        whether a DND-bypass failure is a missing grant rather than an OEM issue.
+
+        Returns:
+            bool: True if notification-policy access is granted.
+        """
+        result = await self._invoke_method(method_name="has_notification_policy_access")
+        return self._check_error(result) == "true"
+
+    async def request_notification_policy_access(self) -> bool:
+        """Open the system do-not-disturb (Zen) access screen for this app.
+
+        Opens Settings so the user can grant notification-policy access (needed
+        for channel_bypass_dnd). The returned bool is the plugin's raw result
+        and is NOT a reliable "opened" indicator — verify the grant afterwards
+        with has_notification_policy_access().
+
+        Returns:
+            bool: Plugin result (do not interpret as "settings opened").
+        """
+        result = await self._invoke_method(method_name="request_notification_policy_access")
+        return self._check_error(result) == "true"
+
+    async def create_notification_channel(
+        self,
+        channel_id: str,
+        channel_name: str,
+        *,
+        channel_description: Optional[str] = None,
+        group_id: Optional[str] = None,
+        importance: str = "default",
+        play_sound: bool = True,
+        sound: Optional[str] = None,
+        enable_vibration: bool = True,
+        vibration_pattern: Optional[list[int]] = None,
+        show_badge: bool = True,
+        channel_bypass_dnd: bool = False,
+    ):
+        """Create (or update) a notification channel up front.
+
+        A channel's sound/vibration/importance are immutable after creation, so
+        to change them you must delete_notification_channel() and recreate with a
+        new configuration (the channel_id may be reused once deleted).
+
+        Args:
+            channel_id: Channel ID.
+            channel_name: Human-readable channel name.
+            channel_description: Channel description shown in system settings.
+            group_id: Optional channel group ID (see create_notification_channel_group).
+            importance: One of "none", "min", "low", "default", "high", "max".
+            play_sound: Whether the channel plays a sound.
+            sound: Raw resource name for a custom sound (omit extension).
+            enable_vibration: Whether the channel vibrates.
+            vibration_pattern: Custom vibration pattern (list of ms durations).
+            show_badge: Whether the channel shows an app-icon badge.
+            channel_bypass_dnd: Whether the channel bypasses do-not-disturb.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        _validate_enum(importance, _VALID_IMPORTANCES, "importance")
+        result = await self._invoke_method(
+            method_name="create_notification_channel",
+            arguments={
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "channel_description": channel_description,
+                "group_id": group_id,
+                "importance": importance,
+                "play_sound": play_sound,
+                "sound": sound,
+                "enable_vibration": enable_vibration,
+                "vibration_pattern": vibration_pattern,
+                "show_badge": show_badge,
+                "channel_bypass_dnd": channel_bypass_dnd,
+            },
+        )
+        return self._check_error(result)
+
+    async def delete_notification_channel(self, channel_id: str):
+        """Delete a notification channel by ID.
+
+        Use this to change an immutable channel property (sound, vibration,
+        importance): delete then recreate with create_notification_channel().
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="delete_notification_channel",
+            arguments={"channel_id": channel_id},
+        )
+        return self._check_error(result)
+
+    async def get_notification_channels(self) -> list[dict]:
+        """Get all notification channels registered by this app.
+
+        Returns:
+            List of dicts with keys: id, name, description, importance (int),
+            play_sound, enable_vibration, bypass_dnd, show_badge.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(method_name="get_notification_channels")
+        self._check_error(result)
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise NotificationError(f"failed to parse response: {e}")
+
+    async def create_notification_channel_group(
+        self,
+        group_id: str,
+        name: str,
+        *,
+        description: Optional[str] = None,
+    ):
+        """Create a notification channel group (a labelled set of channels).
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="create_notification_channel_group",
+            arguments={"group_id": group_id, "name": name, "description": description},
+        )
+        return self._check_error(result)
+
+    async def delete_notification_channel_group(self, group_id: str):
+        """Delete a notification channel group and all its channels.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="delete_notification_channel_group",
+            arguments={"group_id": group_id},
+        )
+        return self._check_error(result)

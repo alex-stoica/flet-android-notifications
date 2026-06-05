@@ -2,7 +2,12 @@
 
 import json
 import flet as ft
-from flet_android_notifications import FletAndroidNotifications, NotificationError
+from flet_android_notifications import (
+    FletAndroidNotifications,
+    NotificationAction,
+    NotificationActionInput,
+    NotificationError,
+)
 
 
 def main(page: ft.Page):
@@ -15,8 +20,12 @@ def main(page: ft.Page):
         data = json.loads(e.data)
         action_id = data.get("action_id", "")
         payload = data.get("payload", "")
+        input_text = data.get("input", "")
 
-        if action_id == "approve":
+        if action_id == "reply":
+            status.value = f"Reply: {input_text or '(empty)'} ({payload})"
+            status.color = ft.Colors.BLUE
+        elif action_id == "approve":
             status.value = f"Approved: {payload}"
             status.color = ft.Colors.GREEN
         elif action_id == "deny":
@@ -42,6 +51,13 @@ def main(page: ft.Page):
                 actions=[
                     {"id": "approve", "title": "Approve"},
                     {"id": "deny", "title": "Deny"},
+                    NotificationAction(
+                        "reply",
+                        "Reply",
+                        semantic_action="reply",
+                        allow_generated_replies=True,
+                        inputs=[NotificationActionInput(label="Type a reply")],
+                    ),
                 ],
             )
         except NotificationError as ex:

@@ -18,10 +18,14 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT / "flet_android_notifications" / "src"))
+from flet_android_notifications.patcher import patch_gradle_file, patch_manifest_file
+
 BUILD_FLUTTER = ROOT / "build" / "flutter"
 APP_ZIP = BUILD_FLUTTER / "app" / "app.zip"
 APP_ZIP_HASH = BUILD_FLUTTER / "app" / "app.zip.hash"
 RES_DIR = BUILD_FLUTTER / "android" / "app" / "src" / "main" / "res"
+PUBSPEC = BUILD_FLUTTER / "pubspec.yaml"
 def _find_flutter() -> Path:
     """Resolve Flutter binary: $FLUTTER_BIN > PATH > latest in ~/flutter/."""
     if env_bin := os.environ.get("FLUTTER_BIN"):
@@ -53,46 +57,42 @@ APP_GRADLE = BUILD_FLUTTER / "android" / "app" / "build.gradle.kts"
 
 SITE_PKG_PREFIX = ".venv/Lib/site-packages/flet_android_notifications/"
 
-# Required AndroidManifest entries for flutter_local_notifications scheduling and foreground
-# services. flet build apk regenerates AndroidManifest.xml from a template each run, wiping
-# any manual additions, so we re-inject these every build.
-FLN_MANIFEST_ENTRIES = """\
-        <receiver android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
-        <receiver android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-        <receiver android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
-        <service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse" />
-"""
 
-MANIFEST_SENTINEL = "ScheduledNotificationReceiver"
-GRADLE_SENTINEL = "isCoreLibraryDesugaringEnabled"
-
-
-def run(cmd, cwd=None, env=None):
+def run(cmd, cwd=None, env=None, allow_failure=False):
     """Run a command, stream output, and raise on failure."""
     print(f"\n>>> {cmd if isinstance(cmd, str) else ' '.join(str(c) for c in cmd)}")
     result = subprocess.run(cmd, cwd=cwd, env=env, shell=isinstance(cmd, str))
     if result.returncode != 0:
+        if allow_failure:
+            print(f"continuing after expected failure with exit code {result.returncode}")
+            return result.returncode
         print(f"FAILED with exit code {result.returncode}")
         sys.exit(1)
+    return result.returncode
 
 
 def step_flet_build():
     """Step 1: run flet build apk."""
     print("\n=== Step 1: flet build apk ===")
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    run("flet build apk -v", cwd=str(ROOT), env=env)
+    run("flet build apk -v", cwd=str(ROOT), env=env, allow_failure=True)
+
+
+def step_clear_generated_flutter_caches():
+    """Remove generated Flutter caches that can keep stale Dart SDK hook DILLs."""
+    print("\n=== Step 0: clear generated Flutter caches ===")
+    if not BUILD_FLUTTER.exists():
+        hash_dir = ROOT / "build" / ".hash"
+        if hash_dir.exists():
+            for path in hash_dir.glob("template-*"):
+                path.unlink()
+                print(f"  removed stale template hash: {path}")
+        print("  no build/flutter directory yet, skipping")
+        return
+    for path in (BUILD_FLUTTER / ".dart_tool",):
+        if path.exists():
+            shutil.rmtree(path)
+            print(f"  removed: {path}")
 
 
 def step_patch_manifest():
@@ -105,16 +105,8 @@ def step_patch_manifest():
     if not ANDROID_MANIFEST.exists():
         print(f"ERROR: {ANDROID_MANIFEST} not found. Run flet build first.")
         sys.exit(1)
-    text = ANDROID_MANIFEST.read_text(encoding="utf-8")
-    if MANIFEST_SENTINEL in text:
-        print("  already patched, skipping")
-        return
-    if "</application>" not in text:
-        print("ERROR: no </application> tag found in AndroidManifest.xml")
-        sys.exit(1)
-    new_text = text.replace("</application>", FLN_MANIFEST_ENTRIES + "    </application>")
-    ANDROID_MANIFEST.write_text(new_text, encoding="utf-8")
-    print(f"  injected receivers + foreground service into {ANDROID_MANIFEST.name}")
+    changed = patch_manifest_file(ANDROID_MANIFEST)
+    print(f"  {'injected receivers + foreground service into' if changed else 'already patched'} {ANDROID_MANIFEST.name}")
 
 
 def step_patch_gradle():
@@ -127,39 +119,43 @@ def step_patch_gradle():
     if not APP_GRADLE.exists():
         print(f"ERROR: {APP_GRADLE} not found. Run flet build first.")
         sys.exit(1)
-    text = APP_GRADLE.read_text(encoding="utf-8")
-    if GRADLE_SENTINEL in text:
-        print("  already patched, skipping")
-        return
+    changed = patch_gradle_file(APP_GRADLE)
+    print(f"  {'enabled desugaring + multidex in' if changed else 'already patched'} {APP_GRADLE.name}")
 
-    # Inject inside compileOptions { ... }
-    co_marker = "targetCompatibility = JavaVersion.VERSION_17"
-    if co_marker not in text:
-        print(f"ERROR: cannot find compileOptions marker '{co_marker}'")
-        sys.exit(1)
-    new_text = text.replace(
-        co_marker,
-        co_marker + "\n        isCoreLibraryDesugaringEnabled = true",
-    )
 
-    # Inject coreLibraryDesugaring dep
-    if "dependencies {}" in new_text:
-        new_text = new_text.replace(
-            "dependencies {}",
-            'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}',
-        )
-    elif "dependencies {" in new_text:
-        new_text = new_text.replace(
-            "dependencies {",
-            'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")',
-            1,
-        )
-    else:
-        print("ERROR: cannot find dependencies block in build.gradle.kts")
+def step_patch_pubspec_paths():
+    """Step 1d: keep generated path dependencies relative to the build directory."""
+    print("\n=== Step 1d: patch pubspec path dependencies ===")
+    if not PUBSPEC.exists():
+        print(f"ERROR: {PUBSPEC} not found. Run flet build first.")
         sys.exit(1)
 
-    APP_GRADLE.write_text(new_text, encoding="utf-8")
-    print(f"  enabled desugaring in {APP_GRADLE.name}")
+    desired_path = "../flutter-packages/flet_android_notifications"
+    text = PUBSPEC.read_text()
+    lines = text.splitlines()
+    changed = False
+
+    for index, line in enumerate(lines):
+        if line.strip() != "flet_android_notifications:":
+            continue
+        for path_index in range(index + 1, min(index + 6, len(lines))):
+            stripped = lines[path_index].lstrip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("path:"):
+                indent = lines[path_index][: len(lines[path_index]) - len(stripped)]
+                replacement = f"{indent}path: {desired_path}"
+                if lines[path_index] != replacement:
+                    lines[path_index] = replacement
+                    changed = True
+                break
+            if not lines[path_index].startswith(" "):
+                break
+        break
+
+    if changed:
+        PUBSPEC.write_text("\n".join(lines) + "\n")
+    print(f"  {'rewrote' if changed else 'already relative'} flet_android_notifications path")
 
 
 def step_patch_app_zip():
@@ -269,6 +265,10 @@ def step_copy_dart_source():
     if not DART_BUILD.exists():
         print(f"  skipping — {DART_BUILD} not found (run full flet build first)")
         return
+    pubspec = DART_SRC / "pubspec.yaml"
+    if pubspec.exists():
+        shutil.copy2(pubspec, DART_BUILD / "pubspec.yaml")
+        print("  copied: pubspec.yaml")
     for dart_file in DART_SRC.rglob("*.dart"):
         rel = dart_file.relative_to(DART_SRC)
         dest = DART_BUILD / rel
@@ -323,10 +323,12 @@ def main():
     args = parser.parse_args()
 
     if not args.skip_flet:
+        step_clear_generated_flutter_caches()
         step_flet_build()
 
     step_patch_manifest()
     step_patch_gradle()
+    step_patch_pubspec_paths()
     step_patch_app_zip()
     step_update_hash()
     step_copy_test_resources()
