@@ -96,6 +96,7 @@ See [`examples/`](examples/) for more: [simple](examples/simple.py), [action but
 |---|---|
 | `get_active_notifications()` | `list[dict]` — currently displayed (id, title, body, channel_id, payload) |
 | `get_pending_notifications()` | `list[dict]` — scheduled/periodic (id, title, body, payload) |
+| `get_notification_app_launch_details()` | `dict` with `did_notification_launch_app` and the launching tap's `notification_response` |
 
 ### Permission & status methods
 
@@ -244,7 +245,7 @@ configure or replace a channel (see below).
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|None` | `None` | rich expandable style |
+| `style` | `BigTextStyle\|BigPictureStyle\|InboxStyle\|MessagingStyle\|None` | `None` | rich expandable style |
 | `show_progress` | `bool` | `False` | show progress bar |
 | `max_progress` | `int` | `0` | max value |
 | `progress` | `int` | `0` | current value |
@@ -335,7 +336,10 @@ Adjust `foregroundServiceType` to match your use case (e.g. `location`, `mediaPl
 ## Styles
 
 ```python
-from flet_android_notifications import BigTextStyle, BigPictureStyle, InboxStyle
+from flet_android_notifications import (
+    BigTextStyle, BigPictureStyle, InboxStyle,
+    MessagingStyle, NotificationMessage, NotificationPerson,
+)
 
 # expandable long text
 style=BigTextStyle("Full text here...", content_title="Expanded title")
@@ -345,6 +349,17 @@ style=BigPictureStyle(drawable_resource="splash")
 
 # list of lines
 style=InboxStyle(["Line 1", "Line 2", "Line 3"], summary_text="3 items")
+
+# chat style with per-message senders (first person is the user themselves;
+# messages with person=None are attributed to them)
+style=MessagingStyle(
+    NotificationPerson("Me"),
+    conversation_title="Team chat",
+    messages=[
+        NotificationMessage("hi", datetime.now(), person=NotificationPerson("Alex")),
+        NotificationMessage("hello back", datetime.now()),
+    ],
+)
 ```
 
 ## Building the APK
