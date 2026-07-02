@@ -6,4 +6,7 @@ from .flet_android_notifications import (
     BigTextStyle,
     BigPictureStyle,
     InboxStyle,
+    MessagingStyle,
+    NotificationMessage,
+    NotificationPerson,
 )

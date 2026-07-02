@@ -11,13 +11,16 @@ import 'package:timezone/data/latest.dart' as tz_data;
 const String _backgroundResponsesKey =
     'flet_android_notifications_background_responses';
 
-String _notificationResponseToJson(NotificationResponse response) => jsonEncode({
+Map<String, dynamic> _notificationResponseToMap(NotificationResponse response) => {
       "notification_id": response.id,
       "payload": response.payload ?? "",
       "action_id": response.actionId ?? "",
       "input": response.input ?? "",
       "response_type": response.notificationResponseType.name,
-    });
+    };
+
+String _notificationResponseToJson(NotificationResponse response) =>
+    jsonEncode(_notificationResponseToMap(response));
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) {
@@ -316,6 +319,31 @@ class NotificationsService extends FletService {
     }
   }
 
+  Person _parsePerson(Map<String, dynamic> data) {
+    AndroidIcon<Object>? icon;
+    final iconValue = data["icon"] as String?;
+    if (iconValue != null) {
+      switch (data["icon_type"] as String? ?? "drawable_resource") {
+        case "file_path":
+          icon = BitmapFilePathAndroidIcon(iconValue);
+          break;
+        case "content_uri":
+          icon = ContentUriAndroidIcon(iconValue);
+          break;
+        default:
+          icon = DrawableResourceAndroidIcon(iconValue);
+      }
+    }
+    return Person(
+      name: data["name"] as String?,
+      key: data["key"] as String?,
+      bot: data["bot"] as bool? ?? false,
+      important: data["important"] as bool? ?? false,
+      uri: data["uri"] as String?,
+      icon: icon,
+    );
+  }
+
   StyleInformation? _parseStyleInformation(Map<String, dynamic>? style) {
     if (style == null) return null;
     switch (style["type"]) {
@@ -357,6 +385,25 @@ class NotificationsService extends FletService {
           lines,
           contentTitle: style["content_title"] as String?,
           summaryText: style["summary_text"] as String?,
+        );
+      case "messaging":
+        final messages = ((style["messages"] as List<dynamic>?) ?? [])
+            .map((message) {
+              final m = Map<String, dynamic>.from(message as Map);
+              return Message(
+                m["text"] as String,
+                DateTime.fromMillisecondsSinceEpoch(m["timestamp_ms"] as int),
+                m["person"] != null
+                    ? _parsePerson(Map<String, dynamic>.from(m["person"] as Map))
+                    : null,
+              );
+            })
+            .toList();
+        return MessagingStyleInformation(
+          _parsePerson(Map<String, dynamic>.from(style["person"] as Map)),
+          conversationTitle: style["conversation_title"] as String?,
+          groupConversation: style["group_conversation"] as bool? ?? false,
+          messages: messages,
         );
       default:
         throw ArgumentError('invalid style type: ${style["type"]}');
@@ -836,6 +883,16 @@ class NotificationsService extends FletService {
             "payload": n.payload ?? "",
           }).toList();
           return jsonEncode(list);
+        case "get_notification_app_launch_details":
+          await _ensureInitialized();
+          final details = await _plugin.getNotificationAppLaunchDetails();
+          final response = details?.notificationResponse;
+          return jsonEncode({
+            "did_notification_launch_app":
+                details?.didNotificationLaunchApp ?? false,
+            "notification_response":
+                response != null ? _notificationResponseToMap(response) : null,
+          });
         case "get_pending_notifications":
           await _ensureInitialized();
           final pending = await _plugin.pendingNotificationRequests();

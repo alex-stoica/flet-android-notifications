@@ -110,7 +110,105 @@ class InboxStyle:
         }
 
 
-NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle]
+class NotificationPerson:
+    """A person shown in MessagingStyle notifications."""
+
+    _VALID_ICON_TYPES = ("drawable_resource", "file_path", "content_uri")
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        *,
+        key: Optional[str] = None,
+        bot: bool = False,
+        important: bool = False,
+        uri: Optional[str] = None,
+        icon: Optional[str] = None,
+        icon_type: str = "drawable_resource",
+    ):
+        if icon is not None and icon_type not in self._VALID_ICON_TYPES:
+            raise ValueError(
+                f"person icon_type must be one of {sorted(self._VALID_ICON_TYPES)}, got: {icon_type!r}"
+            )
+        self.name = name
+        self.key = key
+        self.bot = bot
+        self.important = important
+        self.uri = uri
+        self.icon = icon
+        self.icon_type = icon_type
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "key": self.key,
+            "bot": self.bot,
+            "important": self.important,
+            "uri": self.uri,
+            "icon": self.icon,
+            "icon_type": self.icon_type,
+        }
+
+
+class NotificationMessage:
+    """A single message inside a MessagingStyle notification.
+
+    Messages with person=None are attributed to the style's own person (the
+    user); messages with another person render as incoming.
+    """
+
+    def __init__(
+        self,
+        text: str,
+        timestamp: datetime,
+        *,
+        person: Optional[NotificationPerson] = None,
+    ):
+        if not text:
+            raise ValueError("message text must be a non-empty string")
+        self.text = text
+        self.timestamp = timestamp
+        self.person = person
+
+    def to_dict(self) -> dict:
+        return {
+            "text": self.text,
+            "timestamp_ms": int(self.timestamp.timestamp() * 1000),
+            "person": self.person.to_dict() if self.person else None,
+        }
+
+
+class MessagingStyle:
+    """Chat-style notification with per-message senders and avatars.
+
+    `person` is the user themselves (required by Android, needs at least a
+    name). Rendering of icons/avatars is OEM-dependent.
+    """
+
+    def __init__(
+        self,
+        person: NotificationPerson,
+        *,
+        conversation_title: Optional[str] = None,
+        group_conversation: bool = False,
+        messages: Optional[list[NotificationMessage]] = None,
+    ):
+        self.person = person
+        self.conversation_title = conversation_title
+        self.group_conversation = group_conversation
+        self.messages = messages or []
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "messaging",
+            "person": self.person.to_dict(),
+            "conversation_title": self.conversation_title,
+            "group_conversation": self.group_conversation,
+            "messages": [message.to_dict() for message in self.messages],
+        }
+
+
+NotificationStyle = Union[BigTextStyle, BigPictureStyle, InboxStyle, MessagingStyle]
 
 
 class NotificationActionInput:
@@ -1073,6 +1171,28 @@ class FletAndroidNotifications(ft.Service):
         """
         result = await self._invoke_method(
             method_name="get_pending_notifications",
+        )
+        self._check_error(result)
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise NotificationError(f"failed to parse response: {e}")
+
+    async def get_notification_app_launch_details(self) -> dict:
+        """Check whether the app was launched by tapping a notification.
+
+        Returns:
+            Dict with "did_notification_launch_app" (bool) and
+            "notification_response" (dict or None). When the app was launched
+            from a notification, the response holds the same fields as the
+            on_notification_tap event data: notification_id, payload,
+            action_id, input, response_type.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="get_notification_app_launch_details",
         )
         self._check_error(result)
         try:
