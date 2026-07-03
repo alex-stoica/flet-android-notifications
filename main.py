@@ -14,8 +14,11 @@ from flet_android_notifications import (
     InboxStyle,
     BigPictureStyle,
     BigTextStyle,
+    MessagingStyle,
     NotificationAction,
     NotificationActionInput,
+    NotificationMessage,
+    NotificationPerson,
 )
 
 
@@ -259,7 +262,7 @@ def main(page: ft.Page):
             await notifications.show_notification(
                 notification_id=nid,
                 title="ONGOING #11",
-                body="This can't be swiped away. Use cancel all to dismiss.",
+                body="Sticky on Android 13 and below. On 14+ swiping works.",
                 ongoing=True,
                 auto_cancel=False,
                 channel_id="ongoing_ch",
@@ -641,6 +644,49 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL periodic exact: {type(ex).__name__}: {ex}")
 
+    # -- 28. messaging style (chat conversation) --
+    async def send_messaging(e):
+        try:
+            nid = next_id()
+            me = NotificationPerson("Me")
+            alice = NotificationPerson("Alice", key="alice", important=True)
+            bot = NotificationPerson("BuildBot", key="bot", bot=True)
+            await notifications.show_notification(
+                notification_id=nid,
+                title="MESSAGING #28",
+                body="fallback body (style replaces this when expanded)",
+                style=MessagingStyle(
+                    person=me,
+                    conversation_title="Team chat",
+                    group_conversation=True,
+                    messages=[
+                        NotificationMessage(
+                            "Did the build pass?",
+                            datetime.now() - timedelta(minutes=2),
+                            person=alice,
+                        ),
+                        NotificationMessage(
+                            "All checks green.",
+                            datetime.now() - timedelta(minutes=1),
+                            person=bot,
+                        ),
+                        NotificationMessage("Shipping it now.", datetime.now()),
+                    ],
+                ),
+                icon="ic_notification",
+            )
+            set_log(f"OK messaging #28 (id={nid})")
+        except Exception as ex:
+            set_log(f"FAIL messaging: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+
+    # -- 29. notification app launch details --
+    async def query_launch_details(e):
+        try:
+            details = await notifications.get_notification_app_launch_details()
+            set_log(f"Launch details:\n{json.dumps(details, indent=2)}")
+        except Exception as ex:
+            set_log(f"FAIL launch details: {type(ex).__name__}: {ex}")
+
     def hint(text):
         return ft.Text(text, size=10, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
 
@@ -685,15 +731,15 @@ def main(page: ft.Page):
                 ft.Divider(height=1),
                 ft.Button(content="9. Progress bar (65%)", on_click=send_progress),
                 hint("shows determinate progress bar at 65%.\n"
-                     "notification is ongoing (can't swipe away)."),
+                     "notification is ongoing (swipe-dismissible on Android 14+)."),
                 ft.Divider(height=1),
                 ft.Button(content="10. Indeterminate progress", on_click=send_indeterminate),
                 hint("shows spinning/sliding progress bar.\n"
-                     "notification is ongoing (can't swipe away)."),
+                     "notification is ongoing (swipe-dismissible on Android 14+)."),
                 ft.Divider(height=1),
                 ft.Button(content="11. Ongoing (sticky)", on_click=send_ongoing),
-                hint("can't normally be swiped away. use 'cancel all' to remove.\n"
-                     "verify on this device because OEM notification behavior varies."),
+                hint("sticky only on Android 13 and below; 14+ lets users swipe it away.\n"
+                     "for a truly sticky notification use the foreground service (23)."),
                 ft.Divider(height=1),
                 ft.Button(content="12. Action buttons", on_click=send_actions),
                 hint("shows Approve / Deny buttons.\n"
@@ -767,6 +813,14 @@ def main(page: ft.Page):
                 ft.Button(content="27. Periodic (exact mode)", on_click=send_periodic_exact),
                 hint("periodically_show with schedule_mode='exact_allow_while_idle'\n"
                      "(needs SCHEDULE_EXACT_ALARM; check with button 24)."),
+                ft.Divider(height=1),
+                ft.Button(content="28. Messaging style (chat)", on_click=send_messaging),
+                hint("chat conversation: 2 incoming (Alice, BuildBot) + 1 own message.\n"
+                     "expand to see sender names + 'Team chat' title."),
+                ft.Divider(height=1),
+                ft.Button(content="29. Launch details", on_click=query_launch_details),
+                hint("did_notification_launch_app + tap payload. true only when the\n"
+                     "app was STARTED by tapping a notification (kill app first)."),
                 ft.Divider(),
                 ft.Button(content="Cancel all", on_click=cancel_all),
             ],

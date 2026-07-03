@@ -524,7 +524,9 @@ class FletAndroidNotifications(ft.Service):
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
                 it later requires a different channel_id.
-            ongoing: Persistent notification that can't be swiped away.
+            ongoing: Marks the notification as ongoing. On Android 14+ users
+                can still dismiss it by swiping (platform change); only a
+                foreground service notification is truly sticky.
             auto_cancel: Dismiss notification when tapped. Default True.
             silent: Suppress sound and vibration.
             only_alert_once: Only alert (sound/vibration) on the first
@@ -704,7 +706,9 @@ class FletAndroidNotifications(ft.Service):
                 res/raw/alert_tone.mp3). Omit file extension. The sound
                 is permanently bound to the channel at creation — changing
                 it later requires a different channel_id.
-            ongoing: Persistent notification that can't be swiped away.
+            ongoing: Marks the notification as ongoing. On Android 14+ users
+                can still dismiss it by swiping (platform change); only a
+                foreground service notification is truly sticky.
             auto_cancel: Dismiss notification when tapped. Default True.
             silent: Suppress sound and vibration.
             only_alert_once: Only alert (sound/vibration) on the first

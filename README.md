@@ -236,10 +236,15 @@ configure or replace a channel (see below).
 | `enable_vibration` | `bool` | `True` | vibrate |
 | `sound` | `str\|None` | `None` | raw resource name (e.g. `"alert_tone"`) |
 | `vibration_pattern` | `list[int]\|None` | `None` | e.g. `[0, 500, 200, 500]` |
-| `ongoing` | `bool` | `False` | can't be swiped away |
+| `ongoing` | `bool` | `False` | sticky on Android 13 and below, dismissible on 14+ (see note) |
 | `auto_cancel` | `bool` | `True` | dismiss on tap |
 | `silent` | `bool` | `False` | suppress sound and vibration |
 | `only_alert_once` | `bool` | `False` | alert on first show only |
+
+> **Android 14+ note:** the OS deliberately lets users swipe away `ongoing=True` notifications
+> ([platform change](https://developer.android.com/about/versions/14/behavior-changes-all)).
+> The flag still resists "Clear all" and lock screen dismissal. For a truly non-dismissible
+> notification use `start_foreground_service` (see below).
 
 **Styles and progress:**
 
