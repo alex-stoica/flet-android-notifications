@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data' show Int64List;
 import 'dart:ui' show Color, DartPluginRegistrant;
-import 'package:flet/flet.dart';
+// flet 0.86+ exports its own protocol `Message`, colliding with
+// flutter_local_notifications' messaging-style `Message` used below.
+import 'package:flet/flet.dart' hide Message;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;

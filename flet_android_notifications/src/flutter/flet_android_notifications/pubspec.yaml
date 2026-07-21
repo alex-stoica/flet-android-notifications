@@ -11,7 +11,7 @@ dependencies:
   flet: ">=0.82.0"
   flutter:
     sdk: flutter
-  flutter_local_notifications: ^21.0.0
+  flutter_local_notifications: ^22.1.0
   shared_preferences: ^2.5.3
   timezone: ^0.11.0
 
