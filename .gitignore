@@ -19,6 +19,8 @@ uv.lock
 
 # Local dev notes
 insights/
+docs/button-tests/
+docs/samsung-claims-audit.md
 
 # Flutter pub get artifacts
 .dart_tool/

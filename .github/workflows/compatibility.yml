@@ -1,0 +1,49 @@
+name: compatibility
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "**/*.py"
+      - "**/*.dart"
+      - "**/pubspec.yaml"
+      - ".github/workflows/compatibility.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "**/*.py"
+      - "**/*.dart"
+      - "**/pubspec.yaml"
+      - ".github/workflows/compatibility.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install package against latest flet
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flet pytest
+          python -m pip install ./flet_android_notifications
+
+      - name: Run tests
+        run: python -m pytest tests -q
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.44.9"
+
+      - name: Resolve Flutter extension dependencies
+        working-directory: flet_android_notifications/src/flutter/flet_android_notifications
+        run: flutter pub get
+
+      - name: Analyze Flutter extension
+        working-directory: flet_android_notifications/src/flutter/flet_android_notifications
+        run: flutter analyze

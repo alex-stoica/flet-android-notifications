@@ -443,8 +443,7 @@ the same id.
   (demo button 23).
 - **Bottom line**: if visible color matters, test both regular and foreground-service colorized
   notifications on your target devices.
-- **On-device audit**: every demo button was verified on a Galaxy S25 (One UI, Android 16) — see
-  `docs/button-tests/README.md` and `docs/samsung-claims-audit.md` for per-feature evidence.
+- **On-device audit**: every demo button was verified on a Galaxy S25 (One UI, Android 16).
 
 ## Limitations
 
