@@ -113,6 +113,9 @@ See [`examples/`](examples/) for more: [simple](examples/simple.py), [action but
 Use the status checks (`are_notifications_enabled`, `can_schedule_exact_notifications`,
 `has_notification_policy_access`) to tell *why* a notification didn't appear instead of guessing.
 
+`open_app_notification_settings()` opens the Android notification-settings screen
+for this app, so users can re-enable notifications or adjust channels.
+
 ### Channel management methods
 
 Channel sound/vibration/importance are immutable after creation — delete and recreate a channel to
@@ -369,6 +372,10 @@ style=MessagingStyle(
 
 ## Building the APK
 
+The current notification plugin requires Android 7.0 / API 24 or newer,
+compile SDK 36 or newer, and Java 17. Current Flet Android templates satisfy
+these requirements.
+
 ```bash
 # first build — generates Flutter template, may fail at Gradle
 flet build apk -v
@@ -380,7 +387,7 @@ flet-android-notifications-patch --project-root build/flutter
 flet build apk -v
 ```
 
-Needed because `flutter_local_notifications` v19+ uses Java 8 APIs, and action/scheduling/foreground-service support requires app-level manifest entries. Apply once per clean build directory.
+Needed because `flutter_local_notifications` requires Java 17 desugaring, and action/scheduling/foreground-service support requires app-level manifest entries. Apply once per clean build directory.
 
 ### AndroidManifest.xml entries
 

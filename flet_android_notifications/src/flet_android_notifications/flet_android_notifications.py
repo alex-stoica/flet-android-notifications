@@ -1270,6 +1270,23 @@ class FletAndroidNotifications(ft.Service):
         result = await self._invoke_method(method_name="are_notifications_enabled")
         return self._check_error(result) == "true"
 
+    async def open_app_notification_settings(self) -> bool:
+        """Open Android's notification settings screen for this app.
+
+        This lets a user re-enable notifications or adjust the app's notification
+        channels after :meth:`are_notifications_enabled` returns ``False``.
+
+        Returns:
+            bool: True if Android opened the settings screen.
+
+        Raises:
+            NotificationError: If the native side reports an error.
+        """
+        result = await self._invoke_method(
+            method_name="open_app_notification_settings"
+        )
+        return self._check_error(result) == "true"
+
     async def can_schedule_exact_notifications(self) -> bool:
         """Whether the app may schedule exact alarms (SCHEDULE_EXACT_ALARM).
 

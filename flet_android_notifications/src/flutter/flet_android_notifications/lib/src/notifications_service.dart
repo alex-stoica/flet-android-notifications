@@ -924,6 +924,10 @@ class NotificationsService extends FletService {
           await _ensureInitialized();
           final enabled = await _resolveAndroid().areNotificationsEnabled();
           return (enabled ?? false).toString();
+        case "open_app_notification_settings":
+          await _ensureInitialized();
+          final opened = await _plugin.openAppNotificationSettings();
+          return (opened ?? false).toString();
         case "can_schedule_exact_notifications":
           await _ensureInitialized();
           final can = await _resolveAndroid().canScheduleExactNotifications();
