@@ -33,5 +33,5 @@ flet-android-notifications-patch = "flet_android_notifications.patcher:main"
 packages = ["src/flet_android_notifications", "src/flutter"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling<1.32"]
 build-backend = "hatchling.build"
