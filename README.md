@@ -142,6 +142,9 @@ notifications = FletAndroidNotifications(on_notification_tap=on_tap)
 
 `action_id` is `""` when the body is tapped (not an action button). Inline reply text is returned as `data["input"]`.
 
+Register the handler when creating the service. Queued background taps replay at
+initialization; delivery is best-effort and interrupted replay can repeat an event.
+
 ### Rich Android actions
 
 ```python
@@ -422,14 +425,18 @@ Register BroadcastReceivers inside `<application>` in `build/flutter/android/app
 
 ### Installing on device
 
-Always full-uninstall before installing. Flet caches the extracted Python environment:
+Install updates without clearing app data or notification permissions:
 
 ```bash
-adb uninstall com.yourapp.package
-adb install build/apk/app-release.apk
+adb install -r path/to/app.apk
 ```
 
 On Windows, set `PYTHONIOENCODING=utf-8` before building to avoid Unicode crashes.
+
+For this repo's demo, use `python build.py` (Flet CLI and Flutter required).
+Use `--skip-flet` for Python/Dart source-only rebuilds of an existing project;
+rerun the full build after dependency, asset, or packaging changes. Use
+`--skip-install` to build without touching a device.
 
 ## Custom resources
 

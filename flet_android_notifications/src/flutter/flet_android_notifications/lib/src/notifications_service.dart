@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show Random;
 import 'dart:typed_data' show Int64List;
 import 'dart:ui' show Color, DartPluginRegistrant;
+import 'package:flutter/foundation.dart' show debugPrint;
 // flet 0.86+ exports its own protocol `Message`, colliding with
 // flutter_local_notifications' messaging-style `Message` used below.
 import 'package:flet/flet.dart' hide Message;
@@ -12,6 +14,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 
 const String _backgroundResponsesKey =
     'flet_android_notifications_background_responses';
+const String _backgroundResponsePrefix = '${_backgroundResponsesKey}_';
 
 Map<String, dynamic> _notificationResponseToMap(NotificationResponse response) => {
       "notification_id": response.id,
@@ -25,13 +28,16 @@ String _notificationResponseToJson(NotificationResponse response) =>
     jsonEncode(_notificationResponseToMap(response));
 
 @pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse response) {
+Future<void> notificationTapBackground(NotificationResponse response) async {
   DartPluginRegistrant.ensureInitialized();
-  SharedPreferences.getInstance().then((prefs) {
-    final responses = prefs.getStringList(_backgroundResponsesKey) ?? <String>[];
-    responses.add(_notificationResponseToJson(response));
-    return prefs.setStringList(_backgroundResponsesKey, responses);
-  });
+  final prefs = await SharedPreferences.getInstance();
+  final random = Random.secure();
+  final nonce = base64UrlEncode(List.generate(16, (_) => random.nextInt(256)));
+  // Separate keys avoid read-modify-write races across background isolates.
+  final key = '$_backgroundResponsePrefix${DateTime.now().microsecondsSinceEpoch}_$nonce';
+  if (!await prefs.setString(key, _notificationResponseToJson(response))) {
+    throw StateError('Could not persist notification response');
+  }
 }
 
 class NotificationsService extends FletService {
@@ -58,12 +64,11 @@ class NotificationsService extends FletService {
 
   Future<bool> _ensureInitialized() async {
     if (_initCompleter != null) {
-      final result = await _initCompleter!.future;
-      if (result) return true;
-      // Previous init failed — reset and retry
-      _initCompleter = null;
+      return _initCompleter!.future;
     }
-    _initCompleter = Completer<bool>();
+    final completer = Completer<bool>();
+    _initCompleter = completer;
+    var initialized = false;
 
     try {
       tz_data.initializeTimeZones();
@@ -79,17 +84,28 @@ class NotificationsService extends FletService {
         },
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
-      final initialized = result ?? false;
-      _initCompleter!.complete(initialized);
+      initialized = result ?? false;
       if (initialized) {
-        await _replayLaunchNotificationResponse();
-        await _replayBackgroundNotificationResponses();
+        // Replay failure must not invalidate successful plugin initialization.
+        for (final replay in [
+          _replayLaunchNotificationResponse,
+          _replayBackgroundNotificationResponses,
+        ]) {
+          try {
+            await replay();
+          } catch (e) {
+            debugPrint('Notification response replay failed: $e');
+          }
+        }
       }
     } catch (e) {
-      _initCompleter!.complete(false);
+      debugPrint('Notification initialization failed: $e');
+    } finally {
+      if (!initialized) _initCompleter = null;
+      completer.complete(initialized);
     }
 
-    return _initCompleter!.future;
+    return completer.future;
   }
 
   void _emitNotificationResponse(NotificationResponse response,
@@ -121,12 +137,24 @@ class NotificationsService extends FletService {
 
   Future<void> _replayBackgroundNotificationResponses() async {
     final prefs = await SharedPreferences.getInstance();
-    final responses = prefs.getStringList(_backgroundResponsesKey);
-    if (responses == null || responses.isEmpty) return;
-
-    await prefs.remove(_backgroundResponsesKey);
-    for (final responseJson in responses) {
+    await prefs.reload();
+    // Drain pre-0.11.1 entries too; new callbacks never modify this list.
+    final legacy = prefs.getStringList(_backgroundResponsesKey) ?? <String>[];
+    for (var i = 0; i < legacy.length; i++) {
+      control.triggerEvent("notification_tap", legacy[i]);
+      final saved = i == legacy.length - 1
+          ? await prefs.remove(_backgroundResponsesKey)
+          : await prefs.setStringList(_backgroundResponsesKey, legacy.sublist(i + 1));
+      if (!saved) throw StateError('Could not acknowledge notification response');
+    }
+    final keys = prefs.getKeys().where((key) => key.startsWith(_backgroundResponsePrefix)).toList()..sort();
+    for (final key in keys) {
+      final responseJson = prefs.getString(key);
+      if (responseJson == null) continue;
       control.triggerEvent("notification_tap", responseJson);
+      if (!await prefs.remove(key)) {
+        throw StateError('Could not acknowledge notification response');
+      }
     }
   }
 

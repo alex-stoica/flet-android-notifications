@@ -358,6 +358,17 @@ def _validate_color_hex(color: str) -> None:
         raise ValueError(f"color contains invalid hex characters: {color!r}")
 
 
+def _validate_appearance(*, large_icon, large_icon_type, color, visibility, category):
+    if large_icon is not None:
+        _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
+    if color is not None:
+        _validate_color_hex(color)
+    if visibility is not None:
+        _validate_visibility(visibility)
+    if category is not None:
+        _validate_enum(category, _VALID_CATEGORIES, "category")
+
+
 def _normalize_action_input(input_: Union[NotificationActionInput, dict]) -> dict:
     if isinstance(input_, NotificationActionInput):
         data = input_.to_dict()
@@ -548,14 +559,10 @@ class FletAndroidNotifications(ft.Service):
         """
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
-        if large_icon is not None:
-            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
-        if color is not None:
-            _validate_color_hex(color)
-        if visibility is not None:
-            _validate_visibility(visibility)
-        if category is not None:
-            _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_appearance(
+            large_icon=large_icon, large_icon_type=large_icon_type,
+            color=color, visibility=visibility, category=category,
+        )
         result = await self._invoke_method(
             method_name="show_notification",
             arguments={
@@ -733,14 +740,10 @@ class FletAndroidNotifications(ft.Service):
         _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
         if match_date_time_components is not None:
             _validate_enum(match_date_time_components, _VALID_MATCH_COMPONENTS, "match_date_time_components")
-        if large_icon is not None:
-            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
-        if color is not None:
-            _validate_color_hex(color)
-        if visibility is not None:
-            _validate_visibility(visibility)
-        if category is not None:
-            _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_appearance(
+            large_icon=large_icon, large_icon_type=large_icon_type,
+            color=color, visibility=visibility, category=category,
+        )
         epoch_ms = int(scheduled_time.timestamp() * 1000)
         result = await self._invoke_method(
             method_name="schedule_notification",
@@ -847,14 +850,10 @@ class FletAndroidNotifications(ft.Service):
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_enum(repeat_interval, _VALID_REPEAT_INTERVALS, "repeat_interval")
         _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
-        if large_icon is not None:
-            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
-        if color is not None:
-            _validate_color_hex(color)
-        if visibility is not None:
-            _validate_visibility(visibility)
-        if category is not None:
-            _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_appearance(
+            large_icon=large_icon, large_icon_type=large_icon_type,
+            color=color, visibility=visibility, category=category,
+        )
         result = await self._invoke_method(
             method_name="periodically_show",
             arguments={
@@ -956,14 +955,10 @@ class FletAndroidNotifications(ft.Service):
         """
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
-        if large_icon is not None:
-            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
-        if color is not None:
-            _validate_color_hex(color)
-        if visibility is not None:
-            _validate_visibility(visibility)
-        if category is not None:
-            _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_appearance(
+            large_icon=large_icon, large_icon_type=large_icon_type,
+            color=color, visibility=visibility, category=category,
+        )
         _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
         result = await self._invoke_method(
             method_name="periodically_show_with_duration",
@@ -1093,14 +1088,10 @@ class FletAndroidNotifications(ft.Service):
         if foreground_service_types is not None:
             for fst in foreground_service_types:
                 _validate_enum(fst, _VALID_FOREGROUND_SERVICE_TYPES, "foreground_service_type")
-        if large_icon is not None:
-            _validate_enum(large_icon_type, _VALID_LARGE_ICON_TYPES, "large_icon_type")
-        if color is not None:
-            _validate_color_hex(color)
-        if visibility is not None:
-            _validate_visibility(visibility)
-        if category is not None:
-            _validate_enum(category, _VALID_CATEGORIES, "category")
+        _validate_appearance(
+            large_icon=large_icon, large_icon_type=large_icon_type,
+            color=color, visibility=visibility, category=category,
+        )
         result = await self._invoke_method(
             method_name="start_foreground_service",
             arguments={

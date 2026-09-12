@@ -2,15 +2,15 @@
 
 Pipeline:
   flet build apk
-    -> patch app.zip (replace .pth editable with real .py files)
+    -> refresh staged Python sources (or legacy app.zip)
     -> copy test resources into res/raw/
-    -> regenerate app.zip.hash
     -> flutter build apk --release
-    -> adb uninstall + install + launch
+    -> adb install -r + launch
 """
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -44,7 +44,6 @@ def _find_flutter() -> Path:
     sys.exit(1)
 
 
-FLUTTER_BIN = _find_flutter()
 PACKAGE_SRC = ROOT / "flet_android_notifications" / "src" / "flet_android_notifications"
 TEST_RESOURCES = ROOT / "test_resources"
 PACKAGE_ID = "com.flet.flet_android_notifications_demo"
@@ -58,14 +57,11 @@ APP_GRADLE = BUILD_FLUTTER / "android" / "app" / "build.gradle.kts"
 SITE_PKG_PREFIX = ".venv/Lib/site-packages/flet_android_notifications/"
 
 
-def run(cmd, cwd=None, env=None, allow_failure=False):
+def run(cmd, cwd=None, env=None):
     """Run a command, stream output, and raise on failure."""
-    print(f"\n>>> {cmd if isinstance(cmd, str) else ' '.join(str(c) for c in cmd)}")
+    print(f"\n>>> {cmd if isinstance(cmd, str) else ' '.join(str(c) for c in cmd)}", flush=True)
     result = subprocess.run(cmd, cwd=cwd, env=env, shell=isinstance(cmd, str))
     if result.returncode != 0:
-        if allow_failure:
-            print(f"continuing after expected failure with exit code {result.returncode}")
-            return result.returncode
         print(f"FAILED with exit code {result.returncode}")
         sys.exit(1)
     return result.returncode
@@ -75,24 +71,28 @@ def step_flet_build():
     """Step 1: run flet build apk."""
     print("\n=== Step 1: flet build apk ===")
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    run("flet build apk -v", cwd=str(ROOT), env=env, allow_failure=True)
-
-
-def step_clear_generated_flutter_caches():
-    """Remove generated Flutter caches that can keep stale Dart SDK hook DILLs."""
-    print("\n=== Step 0: clear generated Flutter caches ===")
-    if not BUILD_FLUTTER.exists():
-        hash_dir = ROOT / "build" / ".hash"
-        if hash_dir.exists():
-            for path in hash_dir.glob("template-*"):
-                path.unlink()
-                print(f"  removed stale template hash: {path}")
-        print("  no build/flutter directory yet, skipping")
+    with subprocess.Popen(
+        "flet build apk -v --no-rich-output --skip-flutter-doctor",
+        cwd=str(ROOT), env=env, shell=True, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+    ) as process:
+        output = []
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            output.append(line)
+        code = process.wait()
+    if code == 0:
         return
-    for path in (BUILD_FLUTTER / ".dart_tool",):
-        if path.exists():
-            shutil.rmtree(path)
-            print(f"  removed: {path}")
+    log = re.sub(r"\s+", " ", "".join(output))
+    failed_tasks = re.findall(r"Execution failed for task '([^']+)'", log)
+    expected = (
+        failed_tasks == [":app:checkReleaseAarMetadata"]
+        and "Dependency ':flutter_local_notifications' requires core library desugaring to be enabled" in log
+        and ANDROID_MANIFEST.is_file() and APP_GRADLE.is_file()
+    )
+    if not expected:
+        raise SystemExit(code)
+    print("Continuing to apply the required Android desugaring patch.")
 
 
 def step_patch_manifest():
@@ -159,7 +159,18 @@ def step_patch_pubspec_paths():
 
 
 def step_patch_app_zip():
-    """Step 2: patch app.zip — remove .pth editable, add real .py files."""
+    """Refresh Python sources in current or legacy Flet builds."""
+    staged_app = ROOT / "build" / "python-app"
+    if staged_app.is_dir():
+        destinations = list((ROOT / "build" / "site-packages").glob("*/flet_android_notifications"))
+        if not destinations:
+            raise FileNotFoundError("No staged notification package. Run a full flet build first.")
+        _copy_python_sources(ROOT, staged_app, [ROOT / "main.py"])
+        for destination in destinations:
+            _copy_python_sources(PACKAGE_SRC, destination, PACKAGE_SRC.glob("*.py"))
+        print("  refreshed staged Python sources")
+        return
+
     print("\n=== Step 2: patch app.zip ===")
     if not APP_ZIP.exists():
         print(f"ERROR: {APP_ZIP} not found. Run flet build first.")
@@ -219,8 +230,18 @@ def step_patch_app_zip():
                 print(f"  patched site-packages: {arch_pkg_dir.parent.name}")
 
 
+def _copy_python_sources(source_dir, destination_dir, sources):
+    for source in sources:
+        destination = destination_dir / source.relative_to(source_dir)
+        shutil.copy2(source, destination)
+        # Flet can leave sourceless bytecode beside the refreshed source.
+        destination.with_suffix(".pyc").unlink(missing_ok=True)
+
+
 def step_update_hash():
     """Step 3: regenerate app.zip.hash."""
+    if (ROOT / "build" / "python-app").is_dir():
+        return
     print("\n=== Step 3: regenerate app.zip.hash ===")
     sha256 = hashlib.sha256(APP_ZIP.read_bytes()).hexdigest()
     APP_ZIP_HASH.write_text(sha256)
@@ -269,7 +290,7 @@ def step_copy_dart_source():
     if pubspec.exists():
         shutil.copy2(pubspec, DART_BUILD / "pubspec.yaml")
         print("  copied: pubspec.yaml")
-    for dart_file in DART_SRC.rglob("*.dart"):
+    for dart_file in (DART_SRC / "lib").rglob("*.dart"):
         rel = dart_file.relative_to(DART_SRC)
         dest = DART_BUILD / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -291,22 +312,18 @@ def step_flutter_build():
     env["SERIOUS_PYTHON_SITE_PACKAGES"] = str(site_packages)
     print(f"  SERIOUS_PYTHON_SITE_PACKAGES={site_packages}")
 
-    run([str(FLUTTER_BIN), "build", "apk", "--release"], cwd=str(BUILD_FLUTTER), env=env)
+    run([str(_find_flutter()), "build", "apk", "--release"], cwd=str(BUILD_FLUTTER), env=env)
 
 
 def step_install():
-    """Step 7: adb uninstall + install + launch."""
+    """Install an update without erasing app data, then launch."""
     print("\n=== Step 7: install on device ===")
     apk = BUILD_FLUTTER / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk"
     if not apk.exists():
         print(f"ERROR: APK not found at {apk}")
         sys.exit(1)
 
-    # uninstall (ignore failure if not installed)
-    subprocess.run(["adb", "uninstall", PACKAGE_ID], capture_output=True)
-    print(f"  uninstalled {PACKAGE_ID} (if present)")
-
-    run(["adb", "install", str(apk)])
+    run(["adb", "install", "-r", str(apk)])
     print("  installed successfully")
 
     # launch
@@ -323,7 +340,6 @@ def main():
     args = parser.parse_args()
 
     if not args.skip_flet:
-        step_clear_generated_flutter_caches()
         step_flet_build()
 
     step_patch_manifest()
