@@ -242,9 +242,9 @@ def step_copy_test_resources():
             shutil.copy2(f, dest)
             print(f"  copied: {f.name} -> {dest}")
 
-    # copy drawable XMLs to res/drawable/
+    # Copy vector and bitmap notification icons to res/drawable/.
     for f in TEST_RESOURCES.iterdir():
-        if f.is_file() and f.suffix == ".xml":
+        if f.is_file() and f.suffix in (".xml", ".png"):
             dest = drawable_dir / f.name
             shutil.copy2(f, dest)
             print(f"  copied: {f.name} -> {dest}")

@@ -1018,6 +1018,10 @@ class FletAndroidNotifications(ft.Service):
         payload: str = "",
         start_type: str = "start_sticky",
         foreground_service_types: Optional[list[str]] = None,
+        when: Optional[datetime] = None,
+        show_when: bool = True,
+        uses_chronometer: bool = False,
+        chronometer_count_down: bool = False,
         actions: Optional[list[NotificationActionLike]] = None,
         channel_id: str = "flet_notifications",
         channel_name: str = "Flet Notifications",
@@ -1069,6 +1073,12 @@ class FletAndroidNotifications(ft.Service):
                 location, connected_device, media_projection, camera, microphone,
                 health, remote_messaging, system_exempted, short_service,
                 special_use.
+            when: Timestamp used for the header or timer base. Defaults to now
+                on Android. Naive datetimes use the local timezone.
+            show_when: Display the timestamp or timer in the notification header.
+            uses_chronometer: Display a live elapsed-time counter instead of a timestamp.
+            chronometer_count_down: Count down toward when instead of counting up.
+                Requires uses_chronometer=True; set when to a future datetime.
             (All other params are the same as show_notification.)
 
         Raises:
@@ -1100,6 +1110,10 @@ class FletAndroidNotifications(ft.Service):
                 "payload": payload,
                 "start_type": start_type,
                 "foreground_service_types": foreground_service_types,
+                "when": int(when.timestamp() * 1000) if when is not None else None,
+                "show_when": show_when,
+                "uses_chronometer": uses_chronometer,
+                "chronometer_count_down": chronometer_count_down,
                 "actions": _normalize_actions(actions),
                 "channel_id": channel_id,
                 "channel_name": channel_name,

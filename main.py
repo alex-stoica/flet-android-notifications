@@ -41,7 +41,15 @@ def main(page: ft.Page):
         log.value = msg
         page.update()
 
-    def on_tap(e):
+    async def on_tap(e):
+        data = json.loads(e.data)
+        if data.get("action_id") == "issue7_stop":
+            try:
+                await notifications.stop_foreground_service()
+                set_log("Issue #7 demo stopped")
+            except Exception as ex:
+                set_log(f"FAIL issue #7 stop: {type(ex).__name__}: {ex}")
+            return
         set_log(f"TAP event: {e.data}")
 
     notifications.on_notification_tap = on_tap
@@ -49,6 +57,42 @@ def main(page: ft.Page):
     async def request(e):
         granted = await notifications.request_permissions()
         set_log(f"permissions: {'granted' if granted else 'denied'}")
+
+    async def send_issue7(e):
+        try:
+            if not await notifications.request_permissions():
+                set_log("Issue #7 demo needs notification permission")
+                return
+            await notifications.start_foreground_service(
+                notification_id=7007,
+                title="Wew",
+                body="Currently Hosting",
+                payload="issue7_demo",
+                foreground_service_types=["special_use"],
+                channel_id="issue7_hosting",
+                channel_name="Hosting demo",
+                importance="low",
+                play_sound=False,
+                enable_vibration=False,
+                icon="ic_issue7_notification",
+                large_icon="ic_issue7_bot",
+                large_icon_type="drawable_resource",
+                # Representative grey sampled from issue #7's original image.
+                # Its background varies slightly across the card.
+                color="#464850",
+                colorized=True,
+                ongoing=True,
+                auto_cancel=False,
+                when=datetime.now(),
+                uses_chronometer=True,
+                actions=[NotificationAction(
+                    "issue7_stop", "STOP", title_color="#3C73E8",
+                    shows_user_interface=True, cancel_notification=False,
+                )],
+            )
+            set_log("Issue #7 demo running — open shade and expand; STOP ends it")
+        except Exception as ex:
+            set_log(f"FAIL issue #7: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
 
     # -- 1. baseline: plain notification --
     async def send_baseline(e):
@@ -695,6 +739,8 @@ def main(page: ft.Page):
             [
                 ft.Button(content="Request permissions", on_click=request),
                 log,
+                ft.Button(content="Issue #7: Wew / Currently Hosting", on_click=send_issue7),
+                hint("Live timer + STOP action. Notification demo only; no bot is hosted."),
                 ft.Divider(),
                 ft.Button(content="1. Baseline (no new params)", on_click=send_baseline),
                 ft.Divider(height=1),

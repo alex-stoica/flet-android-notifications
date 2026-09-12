@@ -313,6 +313,14 @@ await notifications.stop_foreground_service()
 |---|---|---|---|
 | `start_type` | `str` | `"start_sticky"` | `start_sticky`, `start_not_sticky`, `start_sticky_compatibility`, `start_redeliver_intent` |
 | `foreground_service_types` | `list[str]\|None` | `None` | e.g. `["special_use"]`, `["location"]`, `["media_playback"]` |
+| `when` | `datetime\|None` | `None` | Header timestamp / timer base; Android uses now if omitted. Naive datetimes use local time. |
+| `show_when` | `bool` | `True` | Show the header timestamp or timer |
+| `uses_chronometer` | `bool` | `False` | Show a live elapsed-time counter in place of the timestamp |
+| `chronometer_count_down` | `bool` | `False` | With `uses_chronometer=True`, count down toward a future `when` |
+
+The timer options above are available starting in **0.11.0**; their defaults
+preserve existing timestamp behavior. They expose native functionality already
+provided by `flutter_local_notifications`, without a fork or custom layout.
 
 All other notification parameters (channel, appearance, behavior, etc.) are the same as `show_notification`.
 

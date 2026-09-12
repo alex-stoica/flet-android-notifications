@@ -504,6 +504,10 @@ class NotificationsService extends FletService {
     int? timeoutAfter,
     AndroidNotificationCategory? category,
     bool fullScreenIntent = false,
+    int? when,
+    bool showWhen = true,
+    bool usesChronometer = false,
+    bool chronometerCountDown = false,
   }) {
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -538,6 +542,10 @@ class NotificationsService extends FletService {
       timeoutAfter: timeoutAfter,
       category: category,
       fullScreenIntent: fullScreenIntent,
+      when: when,
+      showWhen: showWhen,
+      usesChronometer: usesChronometer,
+      chronometerCountDown: chronometerCountDown,
     );
     return NotificationDetails(android: androidDetails);
   }
@@ -815,6 +823,10 @@ class NotificationsService extends FletService {
           final styleInfo = _parseStyleInformation(
               rawStyle != null ? Map<String, dynamic>.from(rawStyle as Map) : null);
           final details = _buildNotificationDetails(
+            when: a["when"] as int?,
+            showWhen: a["show_when"] as bool? ?? true,
+            usesChronometer: a["uses_chronometer"] as bool? ?? false,
+            chronometerCountDown: a["chronometer_count_down"] as bool? ?? false,
             channelId: a["channel_id"] as String,
             channelName: a["channel_name"] as String,
             channelDescription: a["channel_description"] as String,
