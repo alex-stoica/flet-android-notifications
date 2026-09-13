@@ -1,6 +1,6 @@
 [project]
 name = "flet-android-notifications"
-version = "0.11.1.post1"
+version = "0.11.2"
 description = "Native local notifications for Flet apps (Android)"
 requires-python = ">=3.11"
 readme = "../README.md"
@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "flet>=0.82.0",
+    "tzdata",
 ]
 
 [project.urls]

@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import flet as ft
 from typing import Optional, Union
@@ -623,6 +624,7 @@ class FletAndroidNotifications(ft.Service):
         enable_vibration: bool = True,
         schedule_mode: str = "inexact_allow_while_idle",
         match_date_time_components: Optional[str] = None,
+        time_zone: Optional[str] = None,
         style: Optional[NotificationStyle] = None,
         show_progress: bool = False,
         max_progress: int = 0,
@@ -660,7 +662,8 @@ class FletAndroidNotifications(ft.Service):
             title: Notification title.
             body: Notification body text.
             scheduled_time: When to fire. If naive (no tzinfo), treated as
-                local time. If timezone-aware, converted to UTC internally.
+                time in time_zone, or the Python host's local time if omitted.
+                Timezone-aware datetimes always preserve their instant.
             payload: Arbitrary string returned in on_notification_tap event.
             actions: List of NotificationAction objects or compatible dicts.
             channel_id: Android notification channel ID.
@@ -677,6 +680,10 @@ class FletAndroidNotifications(ft.Service):
                 "time" (daily), "day_of_week_and_time" (weekly),
                 "day_of_month_and_time" (monthly), "date_and_time" (yearly),
                 or None (one-shot, default).
+            time_zone: IANA timezone for calendar recurrence, e.g.
+                "Europe/Bucharest". Defaults to scheduled_time's ZoneInfo key,
+                otherwise UTC (legacy behavior). Use a named zone to keep
+                recurring notifications at the same local time across DST.
             style: Notification style (BigTextStyle, BigPictureStyle, or InboxStyle).
             show_progress: Whether to show a progress bar.
             max_progress: Maximum progress value (0 = indeterminate when show_progress is True).
@@ -744,6 +751,12 @@ class FletAndroidNotifications(ft.Service):
             large_icon=large_icon, large_icon_type=large_icon_type,
             color=color, visibility=visibility, category=category,
         )
+        if time_zone is not None:
+            location = ZoneInfo(time_zone)
+            if scheduled_time.utcoffset() is None:
+                scheduled_time = scheduled_time.replace(tzinfo=location)
+        else:
+            time_zone = getattr(scheduled_time.tzinfo, "key", None) or "UTC"
         epoch_ms = int(scheduled_time.timestamp() * 1000)
         result = await self._invoke_method(
             method_name="schedule_notification",
@@ -752,6 +765,7 @@ class FletAndroidNotifications(ft.Service):
                 "title": title,
                 "body": body,
                 "scheduled_epoch_ms": epoch_ms,
+                "time_zone": time_zone,
                 "payload": payload,
                 "actions": _normalize_actions(actions),
                 "channel_id": channel_id,

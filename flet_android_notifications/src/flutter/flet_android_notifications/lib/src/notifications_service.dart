@@ -10,7 +10,7 @@ import 'package:flet/flet.dart' hide Message;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 const String _backgroundResponsesKey =
     'flet_android_notifications_background_responses';
@@ -684,6 +684,7 @@ class NotificationsService extends FletService {
             a["title"] as String,
             a["body"] as String,
             scheduledEpochMs: a["scheduled_epoch_ms"] as int,
+            timeZone: a["time_zone"] as String? ?? "UTC",
             payload: a["payload"] as String,
             channelId: a["channel_id"] as String,
             channelName: a["channel_name"] as String,
@@ -1144,6 +1145,7 @@ class NotificationsService extends FletService {
     String title,
     String body, {
     required int scheduledEpochMs,
+    required String timeZone,
     required String payload,
     required String channelId,
     required String channelName,
@@ -1187,7 +1189,8 @@ class NotificationsService extends FletService {
 
     final scheduledDate = tz.TZDateTime.from(
       DateTime.fromMillisecondsSinceEpoch(scheduledEpochMs, isUtc: true),
-      tz.local,
+      // One-offs retain their exact instant, including the repeated DST hour.
+      matchDateTimeComponents == null ? tz.UTC : tz.getLocation(timeZone),
     );
 
     final details = _buildNotificationDetails(

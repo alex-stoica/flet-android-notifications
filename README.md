@@ -142,6 +142,27 @@ and check `can_schedule_exact_notifications()`; request access with
 `request_exact_alarm_permission()` if needed. Declare `RECEIVE_BOOT_COMPLETED`
 to restore schedules after reboot. Add these under `tool.flet.android.permission`.
 
+For calendar reminders that stay at the same local time across daylight-saving
+changes, set `time_zone` to an IANA name (or pass a datetime with `ZoneInfo`):
+
+```python
+await notifications.schedule_notification(
+    notification_id=3,
+    title="Daily reminder",
+    body="Take a break",
+    scheduled_time=datetime(2026, 10, 24, 9, 0),
+    time_zone="Europe/Bucharest",
+    match_date_time_components="time",
+)
+```
+
+A naive datetime uses `time_zone` when provided; an aware datetime keeps its
+instant and uses the selected zone for recurrence. Without a named zone,
+recurrence retains the previous UTC behavior. One-off notifications keep their
+instant, and interval-based repeats remain elapsed-time schedules.
+Recreate existing recurring schedules after upgrading: their original timezone
+was not saved. The chosen zone stays fixed if the device's timezone changes.
+
 ## Foreground service
 
 Start a native foreground service with a visible notification. This does not,
