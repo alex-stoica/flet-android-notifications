@@ -244,7 +244,7 @@ void main() {
       expect(await invoke('schedule_notification', scheduleArgs(
         instant, timeZone: 'Europe/Bucharest',
       )), 'ok');
-      expect(scheduledPayload()['timeZoneName'], 'UTC');
+      expect(scheduledPayload()['timeZoneName'], anyOf('UTC', 'Etc/UTC'));
       expect(scheduledPayload()['scheduledDateTime'], instant.toIso8601String().split('.').first);
       expect(scheduledPayload().containsKey('matchDateTimeComponents'), isFalse);
     }
