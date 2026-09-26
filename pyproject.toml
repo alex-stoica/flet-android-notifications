@@ -39,3 +39,6 @@ exclude = [
 
 [tool.flet.dev_packages]
 flet-android-notifications = "flet_android_notifications"
+
+[tool.uv.sources]
+flet-android-notifications = { path = "flet_android_notifications", editable = true }

@@ -1,7 +1,7 @@
 # flet-android-notifications
 
-Native local notifications for Flet apps: actions, scheduling, progress, rich styles,
-and foreground-service timers. Python API backed by `flutter_local_notifications`.
+Android notifications for Flet: actions, scheduling, progress, styles, and timers.
+Backed by `flutter_local_notifications`.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/alex-stoica/flet-android-notifications/master/docs/screenshots/style-showcase.png" width="45%" alt="Demo notifications: actions, progress, BigText, large icon, BigPicture" />
@@ -9,7 +9,7 @@ and foreground-service timers. Python API backed by `flutter_local_notifications
   <img src="https://raw.githubusercontent.com/alex-stoica/flet-android-notifications/master/docs/screenshots/colorized-foreground-service.png" width="45%" alt="Foreground service with red colorized background on Samsung OneUI, plus secret/sub-text/vibration variants" />
 </p>
 
-*Real demo notifications on Samsung One UI: actions, progress, rich styles, and a colorized foreground service. Appearance varies by device.*
+*Samsung One UI examples; appearance varies by device.*
 
 ## Install
 
@@ -17,7 +17,7 @@ and foreground-service timers. Python API backed by `flutter_local_notifications
 pip install flet-android-notifications
 ```
 
-Add the dependency and notification permission to your app's `pyproject.toml`:
+In your app's `pyproject.toml`:
 
 ```toml
 [project]
@@ -48,34 +48,36 @@ def main(page: ft.Page):
 ft.run(main)
 ```
 
-Instantiate `FletAndroidNotifications` once. Don't add it to `page.overlay` or `page.controls` — it's a service, not a visual control.
+Instantiate the service once; don't add it to `page.overlay` or `page.controls`.
 
-Build an Android APK using the steps below; desktop preview does not send notifications.
+Build an APK; desktop preview cannot send notifications.
 
 ### Build and install
 
 Requires Python 3.11+, Flet 0.82+, Android API 24+, compile SDK 36+, and Java 17.
 
 ```bash
-# Generate the Flutter project and package the Python app.
+# Generate and package.
 flet build apk -v
 
-# Add notification receivers/service and Gradle desugaring.
+# Patch Android setup.
 flet-android-notifications-patch --project-root build/flutter
 
-# Build the patched project.
+# Rebuild.
 cd build/flutter
 flutter build apk --release
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-The first build may fail because desugaring is missing; patch and rebuild for that
-error only. Resolve unrelated failures first. Reapply the patch after regenerating
-the Flutter project. `adb install -r` preserves app data and permissions.
-On Windows, set `PYTHONIOENCODING=utf-8` before building.
+Only a missing-desugaring failure permits continuing to patch/rebuild. Fix other
+errors first. Repatch after regeneration. `adb install -r` preserves data and
+permissions. Windows builds need `PYTHONIOENCODING=utf-8`.
 
-More runnable [examples](https://github.com/alex-stoica/flet-android-notifications/tree/master/examples):
-actions, scheduling, styles, periodic notifications, queries, and foreground services.
+[More examples](https://github.com/alex-stoica/flet-android-notifications/tree/master/examples).
+
+Demo: `uv sync` uses this checkout. Refresh its ignored lockfile with
+`uv lock --upgrade-package flet`. With compatible Flutter on `PATH`, run
+`uv run --with flet-cli python build.py` to build, patch, and install.
 
 ## Actions and taps
 

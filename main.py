@@ -8,6 +8,7 @@ import asyncio
 import json
 import traceback
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import flet as ft
 from flet_android_notifications import (
     FletAndroidNotifications,
@@ -731,6 +732,26 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL launch details: {type(ex).__name__}: {ex}")
 
+    async def send_zoned_daily(e):
+        try:
+            nid = next_id()
+            fire_at = datetime.now(ZoneInfo("Europe/Bucharest")) + timedelta(seconds=15)
+            await notifications.schedule_notification(
+                notification_id=nid,
+                title="ZONED DAILY #30",
+                body=f"Daily at {fire_at:%H:%M:%S} Europe/Bucharest",
+                scheduled_time=fire_at,
+                match_date_time_components="time",
+                channel_id="zoned_daily_demo",
+                channel_name="Named timezone demo",
+                play_sound=False,
+                enable_vibration=False,
+                icon="ic_notification",
+            )
+            set_log(f"OK zoned daily #30 (id={nid}), first fire {fire_at.isoformat()}")
+        except Exception as ex:
+            set_log(f"FAIL zoned daily: {type(ex).__name__}: {ex}")
+
     def hint(text):
         return ft.Text(text, size=10, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
 
@@ -867,6 +888,10 @@ def main(page: ft.Page):
                 ft.Button(content="29. Launch details", on_click=query_launch_details),
                 hint("did_notification_launch_app + tap payload. true only when the\n"
                      "app was STARTED by tapping a notification (kill app first)."),
+                ft.Divider(height=1),
+                ft.Button(content="30. Daily reminder (Bucharest timezone)", on_click=send_zoned_daily),
+                hint("First delivery in about 15s, then daily at the same Bucharest time.\n"
+                     "Inexact delivery may be delayed. Cancel all after testing."),
                 ft.Divider(),
                 ft.Button(content="Cancel all", on_click=cancel_all),
             ],
