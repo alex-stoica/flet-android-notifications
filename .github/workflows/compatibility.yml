@@ -40,7 +40,7 @@ jobs:
           requirement=flet
           if [ "$FLET_VERSION" != latest ]; then requirement="flet==$FLET_VERSION"; fi
           python -m pip install "$requirement" pytest ./flet_android_notifications
-          python -c "from flet.version import version, flutter_version; print('flet=' + version); print('flutter=' + flutter_version)" >> "$GITHUB_OUTPUT"
+          python -c "from flet.version import flet_version, flutter_version; print('flet=' + flet_version); print('flutter=' + flutter_version)" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
         run: python -m pytest tests -q
