@@ -73,6 +73,17 @@ void main() {
   Map<dynamic, dynamic> scheduledPayload() =>
       calls.lastWhere((c) => c.method == 'zonedSchedule').arguments as Map;
 
+  Future<void> tap(int id) async {
+    await binding.defaultBinaryMessenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall(
+        'didReceiveNotificationResponse',
+        {'notificationId': id, 'notificationResponseType': 0, 'payload': 'tap'},
+      )),
+      (_) {},
+    );
+  }
+
   setUp(() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     AndroidFlutterLocalNotificationsPlugin.registerWith();
@@ -354,6 +365,64 @@ void main() {
     final keys = prefs.getKeys().where((key) => key.startsWith('${queueKey}_'));
     expect(keys, hasLength(1));
     expect(jsonDecode(prefs.getString(keys.single)!)['notification_id'], 99);
+  });
+
+  test('disposed controls receive no native callbacks', () async {
+    service.init();
+    await invoke('are_notifications_enabled');
+    service.dispose();
+    await tap(901);
+    expect(control.events, isEmpty);
+    service = NotificationsService(control: control)..init();
+    await invoke('are_notifications_enabled');
+    expect(control.events, hasLength(1));
+    expect(jsonDecode(control.events.single)['notification_id'], 901);
+  });
+
+  test('disposal during initialization preserves queued actions', () async {
+    SharedPreferences.setMockInitialValues({'${queueKey}_late': 'queued'});
+    final ready = Completer<bool>();
+    native = (call) async => call.method == 'initialize'
+        ? ready.future
+        : call.method == 'getNotificationAppLaunchDetails' ? null : true;
+    service.init();
+    final pending = invoke('are_notifications_enabled');
+    service.dispose();
+    ready.complete(true);
+    await pending;
+    expect(control.events, isEmpty);
+    expect((await SharedPreferences.getInstance()).getString('${queueKey}_late'), 'queued');
+    service = NotificationsService(control: control)..init();
+    await invoke('are_notifications_enabled');
+    expect(control.events, ['queued']);
+  });
+
+  test('disposing a replacement restores the surviving callback target', () async {
+    service.init();
+    await invoke('are_notifications_enabled');
+    final replacement = TestControl();
+    final second = NotificationsService(control: replacement)..init();
+    await replacement.listener!('are_notifications_enabled', {});
+    await tap(902);
+    expect(replacement.events, hasLength(1));
+    expect(control.events, isEmpty);
+    second.dispose();
+    await tap(903);
+    expect(control.events, hasLength(1));
+    expect(replacement.events, hasLength(1));
+  });
+
+  test('remount does not replay the same launch notification', () async {
+    native = (call) async => call.method == 'getNotificationAppLaunchDetails'
+        ? {'notificationLaunchedApp': true, 'notificationResponse': {
+            'notificationId': 904, 'notificationResponseType': 0, 'payload': 'cold-launch'}}
+        : true;
+    service.init();
+    await invoke('are_notifications_enabled');
+    service.dispose();
+    service = NotificationsService(control: control)..init();
+    await invoke('are_notifications_enabled');
+    expect(control.events, hasLength(1));
   });
 
   test('dispose removes the method listener', () async {

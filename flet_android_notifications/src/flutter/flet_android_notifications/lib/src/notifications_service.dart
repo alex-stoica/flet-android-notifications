@@ -4,9 +4,7 @@ import 'dart:math' show Random;
 import 'dart:typed_data' show Int64List;
 import 'dart:ui' show Color, DartPluginRegistrant;
 import 'package:flutter/foundation.dart' show debugPrint;
-// flet 0.86+ exports its own protocol `Message`, colliding with
-// flutter_local_notifications' messaging-style `Message` used below.
-import 'package:flet/flet.dart' hide Message;
+import 'package:flet/flet.dart' show FletService;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -43,6 +41,11 @@ Future<void> notificationTapBackground(NotificationResponse response) async {
 class NotificationsService extends FletService {
   NotificationsService({required super.control});
 
+  static final _services = <NotificationsService>[];
+  static Future<void> _replayPending = Future<void>.value();
+  static String? _lastLaunchResponse;
+  bool get _active => _services.isNotEmpty && identical(_services.last, this);
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   Completer<bool>? _initCompleter;
@@ -52,12 +55,14 @@ class NotificationsService extends FletService {
   @override
   void init() {
     super.init();
+    _services.add(this);
     control.addInvokeMethodListener(_onMethod);
     _ensureInitialized();
   }
 
   @override
   void dispose() {
+    _services.remove(this);
     control.removeInvokeMethodListener(_onMethod);
     super.dispose();
   }
@@ -80,23 +85,34 @@ class NotificationsService extends FletService {
       final result = await _plugin.initialize(
         settings: initSettings,
         onDidReceiveNotificationResponse: (response) {
-          _emitNotificationResponse(response);
+          if (_services.isNotEmpty) {
+            _services.last._emitNotificationResponse(response);
+          } else {
+            _replayPending = _replayPending
+                .then((_) => notificationTapBackground(response))
+                .catchError((Object error) {
+              debugPrint('Notification response persistence failed: $error');
+            });
+          }
         },
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
       initialized = result ?? false;
       if (initialized) {
-        // Replay failure must not invalidate successful plugin initialization.
-        for (final replay in [
-          _replayLaunchNotificationResponse,
-          _replayBackgroundNotificationResponses,
-        ]) {
-          try {
-            await replay();
-          } catch (e) {
-            debugPrint('Notification response replay failed: $e');
+        // Serialize queue draining across service instances.
+        _replayPending = _replayPending.then((_) async {
+          for (final replay in [
+            _replayLaunchNotificationResponse,
+            _replayBackgroundNotificationResponses,
+          ]) {
+            try {
+              if (_active) await replay();
+            } catch (e) {
+              debugPrint('Notification response replay failed: $e');
+            }
           }
-        }
+        });
+        await _replayPending;
       }
     } catch (e) {
       debugPrint('Notification initialization failed: $e');
@@ -110,9 +126,9 @@ class NotificationsService extends FletService {
 
   void _emitNotificationResponse(NotificationResponse response,
       {bool skipDebounce = false}) {
+    if (!_active) return;
     final hasAction = response.actionId != null && response.actionId!.isNotEmpty;
-    // Debounce only body taps. Some Android skins can fire a body tap
-    // immediately after show, while action button presses are intentional.
+    // Debounce immediate OEM body taps; always deliver explicit actions.
     if (!skipDebounce &&
         !hasAction &&
         _lastShowTime != null &&
@@ -127,20 +143,25 @@ class NotificationsService extends FletService {
     _launchResponseReplayed = true;
 
     final details = await _plugin.getNotificationAppLaunchDetails();
-    if (details == null || !details.didNotificationLaunchApp) return;
+    if (!_active || details == null || !details.didNotificationLaunchApp) return;
 
     final response = details.notificationResponse;
     if (response != null) {
+      final encoded = _notificationResponseToJson(response);
+      if (_lastLaunchResponse == encoded) return;
       _emitNotificationResponse(response, skipDebounce: true);
+      _lastLaunchResponse = encoded;
     }
   }
 
   Future<void> _replayBackgroundNotificationResponses() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
+    if (!_active) return;
     // Drain pre-0.11.1 entries too; new callbacks never modify this list.
     final legacy = prefs.getStringList(_backgroundResponsesKey) ?? <String>[];
     for (var i = 0; i < legacy.length; i++) {
+      if (!_active) return;
       control.triggerEvent("notification_tap", legacy[i]);
       final saved = i == legacy.length - 1
           ? await prefs.remove(_backgroundResponsesKey)
@@ -149,6 +170,7 @@ class NotificationsService extends FletService {
     }
     final keys = prefs.getKeys().where((key) => key.startsWith(_backgroundResponsePrefix)).toList()..sort();
     for (final key in keys) {
+      if (!_active) return;
       final responseJson = prefs.getString(key);
       if (responseJson == null) continue;
       control.triggerEvent("notification_tap", responseJson);

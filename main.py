@@ -1,8 +1,4 @@
-"""Diagnostic test app for all notification features.
-
-Each button tests a single feature. Status text shows OK/FAIL + notification ID.
-Instructions under each button explain what to look for on the device.
-"""
+"""Notification feature diagnostics. Buttons report results and notification IDs; nearby instructions describe device checks."""
 
 import asyncio
 import json
@@ -394,13 +390,7 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL sub text: {type(ex).__name__}: {ex}")
 
-    # -- 14. visibility (secret — hidden on lock screen).
-    # Schedules at +8s so user has time to lock the screen before it fires.
-    # NOTE: importance MUST be at least "default" — IMPORTANCE_MIN (the previous
-    # value here) makes the notification have no sound/heads-up/status-icon and
-    # buries it in a hidden shade section, which is indistinguishable from
-    # "didn't fire". visibility="secret" already does the lock-screen-hide job;
-    # they are independent dimensions.
+    # Delay allows locking. Secret visibility hides lock-screen content; default importance keeps delivery visible in the shade.
     async def send_visibility(e):
         try:
             nid = next_id()
@@ -501,13 +491,7 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL timeout: {type(ex).__name__}: {ex}")
 
-    # -- 19. periodic notification using PRESET interval enum.
-    # Calls flutter_local_notifications.periodicallyShow which only accepts the
-    # fixed enum values: every_minute, hourly, daily, weekly. For arbitrary
-    # intervals (e.g. 90s, 5min) use button 20 instead.
-    # periodicallyShow fires the FIRST notification at now+interval (so a 60s
-    # wait for every_minute). The kickoff show_notification below gives the
-    # user instant feedback that the call worked.
+    # Preset intervals fire after one interval; the kickoff notification confirms setup immediately. Button 20 accepts custom durations.
     async def send_periodic(e):
         try:
             nid = next_id()
@@ -528,11 +512,7 @@ def main(page: ft.Page):
         except Exception as ex:
             set_log(f"FAIL periodic: {type(ex).__name__}: {ex}")
 
-    # -- 20. periodic with ARBITRARY duration (any number of seconds).
-    # Calls flutter_local_notifications.periodicallyShowWithDuration which
-    # takes a Duration, so anything from a few seconds upward is allowed.
-    # Use this when you need a custom interval not covered by button 19's
-    # preset enum (90s here, but could be 30s, 5min, 12h, etc).
+    # Custom 90-second interval, unlike button 19's fixed presets.
     async def send_periodic_duration(e):
         try:
             nid = next_id()

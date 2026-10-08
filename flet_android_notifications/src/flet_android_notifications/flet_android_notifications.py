@@ -39,11 +39,7 @@ class BigTextStyle:
 
 
 class BigPictureStyle:
-    """Notification style that shows a large image when expanded.
-
-    Provide exactly one of file_path or drawable_resource for the main image.
-    Optionally provide a large icon via large_icon_file_path or large_icon_drawable_resource.
-    """
+    """Expanded image notification. Supply one main image: file_path or drawable_resource. Optional large-icon fields accept files or drawable resources."""
 
     def __init__(
         self,
@@ -152,11 +148,7 @@ class NotificationPerson:
 
 
 class NotificationMessage:
-    """A single message inside a MessagingStyle notification.
-
-    Messages with person=None are attributed to the style's own person (the
-    user); messages with another person render as incoming.
-    """
+    """MessagingStyle message. Omitting person attributes it to the style's user; another person represents an incoming message."""
 
     def __init__(
         self,
@@ -480,84 +472,7 @@ class FletAndroidNotifications(ft.Service):
         category: Optional[str] = None,
         full_screen_intent: bool = False,
     ):
-        """Show an Android notification.
-
-        Args:
-            notification_id: Unique integer ID for this notification.
-            title: Notification title.
-            body: Notification body text.
-            payload: Arbitrary string returned in on_notification_tap event.
-            actions: List of NotificationAction objects or compatible dicts.
-                Dicts must include "id" and "title". Rich Android action
-                fields include inputs, title_color, icon, contextual,
-                allow_generated_replies, semantic_action, and invisible.
-                The tapped action's id is returned as "action_id" in the
-                on_notification_tap event data (JSON string). Inline reply
-                text is returned as "input".
-            channel_id: Android notification channel ID.
-            channel_name: Human-readable channel name (shown in system settings).
-            channel_description: Channel description (shown in system settings).
-            importance: One of "none", "min", "low", "default", "high", "max".
-            play_sound: Whether to play the default notification sound.
-            enable_vibration: Whether to vibrate on notification.
-            style: Notification style (BigTextStyle, BigPictureStyle, or InboxStyle).
-            show_progress: Whether to show a progress bar.
-            max_progress: Maximum progress value (0 = indeterminate when show_progress is True).
-            progress: Current progress value.
-            indeterminate: Whether the progress bar is indeterminate.
-            group_key: Group key for bundling notifications together.
-            set_as_group_summary: If True, this notification is the group
-                summary. You must manage summary lifecycle yourself.
-            group_alert_behavior: "all", "summary", or "children".
-            icon: Drawable resource name for the small status bar icon
-                (e.g. "ic_notification"). None = app launcher icon. Must
-                be a compiled Android drawable, not a file path. Android
-                renders small icons as single-color silhouettes.
-            large_icon: Large icon shown on the notification's right side.
-                Interpreted according to large_icon_type.
-            large_icon_type: "drawable_resource" (default) or "file_path".
-            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). The
-                Android contract says this tints the small icon and
-                accent areas. In practice, on Samsung OneUI (Brief mode,
-                default on Galaxy) the value reaches the OS but is NOT
-                rendered visibly for regular notifications — verified by
-                comparing two notifications side-by-side, one with color
-                set and one without, both look identical. Renders
-                visibly on AOSP/Pixel. Reliable visible color on Samsung
-                requires start_foreground_service() with colorized=True.
-            colorized: When True, applies color as the notification
-                background. Per Android contract, has effect ONLY on
-                foreground service or media-style notifications — for a
-                regular show_notification call this flag is silently
-                ignored. Use start_foreground_service() with color +
-                colorized for a fully colored background. Verified working
-                on Samsung OneUI when wired up correctly.
-            sound: Raw resource name (e.g. "alert_tone" for
-                res/raw/alert_tone.mp3). Omit file extension. The sound
-                is permanently bound to the channel at creation — changing
-                it later requires a different channel_id.
-            ongoing: Marks the notification as ongoing. On Android 14+ users
-                can still dismiss it by swiping (platform change); only a
-                foreground service notification is truly sticky.
-            auto_cancel: Dismiss notification when tapped. Default True.
-            silent: Suppress sound and vibration.
-            only_alert_once: Only alert (sound/vibration) on the first
-                show; updates are silent.
-            visibility: Lock screen visibility. One of "public" (show
-                full content), "private" (hide sensitive content), or
-                "secret" (don't show on lock screen at all).
-            sub_text: Small text shown below the notification content.
-            channel_bypass_dnd: Allow the notification channel to bypass
-                do-not-disturb mode. Only takes effect when the channel
-                is first created.
-            vibration_pattern: Custom vibration pattern as a list of
-                millisecond durations, e.g. [0, 500, 200, 500].
-            timeout_after: Auto-dismiss the notification after this many
-                milliseconds. None means no timeout.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Show a notification with optional styling and actions. Tap events contain payload, action_id and inline input. Native failures raise NotificationError."""
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_appearance(
@@ -651,97 +566,7 @@ class FletAndroidNotifications(ft.Service):
         category: Optional[str] = None,
         full_screen_intent: bool = False,
     ):
-        """Schedule an Android notification for a future time.
-
-        Uses Android's AlarmManager via zonedSchedule(). The notification
-        fires even if the app is killed or the device restarts (if the
-        required BroadcastReceivers are registered in AndroidManifest.xml).
-
-        Args:
-            notification_id: Unique integer ID for this notification.
-            title: Notification title.
-            body: Notification body text.
-            scheduled_time: When to fire. If naive (no tzinfo), treated as
-                time in time_zone, or the Python host's local time if omitted.
-                Timezone-aware datetimes always preserve their instant.
-            payload: Arbitrary string returned in on_notification_tap event.
-            actions: List of NotificationAction objects or compatible dicts.
-            channel_id: Android notification channel ID.
-            channel_name: Human-readable channel name.
-            channel_description: Channel description.
-            importance: One of "none", "min", "low", "default", "high", "max".
-            play_sound: Whether to play the default notification sound.
-            enable_vibration: Whether to vibrate on notification.
-            schedule_mode: One of "alarm_clock", "exact",
-                "exact_allow_while_idle", "inexact",
-                "inexact_allow_while_idle" (default). Exact modes require
-                SCHEDULE_EXACT_ALARM permission.
-            match_date_time_components: For recurring notifications. One of
-                "time" (daily), "day_of_week_and_time" (weekly),
-                "day_of_month_and_time" (monthly), "date_and_time" (yearly),
-                or None (one-shot, default).
-            time_zone: IANA timezone for calendar recurrence, e.g.
-                "Europe/Bucharest". Defaults to scheduled_time's ZoneInfo key,
-                otherwise UTC (legacy behavior). Use a named zone to keep
-                recurring notifications at the same local time across DST.
-            style: Notification style (BigTextStyle, BigPictureStyle, or InboxStyle).
-            show_progress: Whether to show a progress bar.
-            max_progress: Maximum progress value (0 = indeterminate when show_progress is True).
-            progress: Current progress value.
-            indeterminate: Whether the progress bar is indeterminate.
-            group_key: Group key for bundling notifications together.
-            set_as_group_summary: If True, this notification is the group
-                summary. You must manage summary lifecycle yourself.
-            group_alert_behavior: "all", "summary", or "children".
-            icon: Drawable resource name for the small status bar icon
-                (e.g. "ic_notification"). None = app launcher icon. Must
-                be a compiled Android drawable, not a file path. Android
-                renders small icons as single-color silhouettes.
-            large_icon: Large icon shown on the notification's right side.
-                Interpreted according to large_icon_type.
-            large_icon_type: "drawable_resource" (default) or "file_path".
-            color: Hex color string (e.g. "#FF5722" or "#80FF5722"). The
-                Android contract says this tints the small icon and
-                accent areas. In practice, on Samsung OneUI (Brief mode,
-                default on Galaxy) the value reaches the OS but is NOT
-                rendered visibly for regular notifications — verified by
-                comparing two notifications side-by-side, one with color
-                set and one without, both look identical. Renders
-                visibly on AOSP/Pixel. Reliable visible color on Samsung
-                requires start_foreground_service() with colorized=True.
-            colorized: When True, applies color as the notification
-                background. Per Android contract, has effect ONLY on
-                foreground service or media-style notifications — for a
-                regular show_notification call this flag is silently
-                ignored. Use start_foreground_service() with color +
-                colorized for a fully colored background. Verified working
-                on Samsung OneUI when wired up correctly.
-            sound: Raw resource name (e.g. "alert_tone" for
-                res/raw/alert_tone.mp3). Omit file extension. The sound
-                is permanently bound to the channel at creation — changing
-                it later requires a different channel_id.
-            ongoing: Marks the notification as ongoing. On Android 14+ users
-                can still dismiss it by swiping (platform change); only a
-                foreground service notification is truly sticky.
-            auto_cancel: Dismiss notification when tapped. Default True.
-            silent: Suppress sound and vibration.
-            only_alert_once: Only alert (sound/vibration) on the first
-                show; updates are silent.
-            visibility: Lock screen visibility. One of "public" (show
-                full content), "private" (hide sensitive content), or
-                "secret" (don't show on lock screen at all).
-            sub_text: Small text shown below the notification content.
-            channel_bypass_dnd: Allow the notification channel to bypass
-                do-not-disturb mode. Only takes effect when the channel
-                is first created.
-            vibration_pattern: Custom vibration pattern as a list of
-                millisecond durations, e.g. [0, 500, 200, 500].
-            timeout_after: Auto-dismiss the notification after this many
-                milliseconds. None means no timeout.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Schedule using Android alarms. Aware datetimes preserve their instant; named zones preserve recurring local times across DST. Exact modes require permission."""
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_enum(schedule_mode, _VALID_SCHEDULE_MODES, "schedule_mode")
@@ -846,20 +671,7 @@ class FletAndroidNotifications(ft.Service):
         timeout_after: Optional[int] = None,
         category: Optional[str] = None,
     ):
-        """Show a notification that repeats at a fixed interval.
-
-        Args:
-            notification_id: Unique integer ID for this notification.
-            title: Notification title.
-            body: Notification body text.
-            repeat_interval: One of "every_minute", "hourly", "daily", "weekly".
-            payload: Arbitrary string returned in on_notification_tap event.
-            timeout_after: Auto-dismiss after this many milliseconds.
-            (All other params are the same as show_notification.)
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Repeat every_minute, hourly, daily or weekly. Other options match show_notification; native failures raise NotificationError."""
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_enum(repeat_interval, _VALID_REPEAT_INTERVALS, "repeat_interval")
@@ -953,20 +765,7 @@ class FletAndroidNotifications(ft.Service):
         timeout_after: Optional[int] = None,
         category: Optional[str] = None,
     ):
-        """Show a notification that repeats at a custom duration.
-
-        Args:
-            notification_id: Unique integer ID for this notification.
-            title: Notification title.
-            body: Notification body text.
-            duration_seconds: Repeat interval in seconds.
-            payload: Arbitrary string returned in on_notification_tap event.
-            timeout_after: Auto-dismiss after this many milliseconds.
-            (All other params are the same as show_notification.)
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Repeat at duration_seconds intervals. Other options match show_notification; native failures raise NotificationError."""
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         _validate_enum(group_alert_behavior, _VALID_GROUP_ALERT_BEHAVIORS, "group_alert_behavior")
         _validate_appearance(
@@ -1063,37 +862,7 @@ class FletAndroidNotifications(ft.Service):
         timeout_after: Optional[int] = None,
         category: Optional[str] = None,
     ):
-        """Start an Android foreground service with a persistent notification.
-
-        Foreground services keep the app alive for long-running tasks (music,
-        GPS, uploads). The notification cannot be swiped away and is not
-        removed by cancel() — use stop_foreground_service() instead.
-
-        Args:
-            notification_id: Unique integer ID. Must not be 0 (Android constraint).
-            title: Notification title.
-            body: Notification body text.
-            payload: Arbitrary string returned in on_notification_tap event.
-            start_type: Service start type. One of "start_sticky" (default),
-                "start_not_sticky", "start_sticky_compatibility",
-                "start_redeliver_intent".
-            foreground_service_types: List of foreground service types, e.g.
-                ["special_use"]. Values: data_sync, media_playback, phone_call,
-                location, connected_device, media_projection, camera, microphone,
-                health, remote_messaging, system_exempted, short_service,
-                special_use.
-            when: Timestamp used for the header or timer base. Defaults to now
-                on Android. Naive datetimes use the local timezone.
-            show_when: Display the timestamp or timer in the notification header.
-            uses_chronometer: Display a live elapsed-time counter instead of a timestamp.
-            chronometer_count_down: Count down toward when instead of counting up.
-                Requires uses_chronometer=True; set when to a future datetime.
-            (All other params are the same as show_notification.)
-
-        Raises:
-            ValueError: If notification_id is 0, or start_type/foreground_service_types invalid.
-            NotificationError: If the native side reports an error.
-        """
+        """Start a foreground notification service with a nonzero ID and declared types. Stop with stop_foreground_service(). Android restrictions apply; Python execution is not guaranteed."""
         if notification_id == 0:
             raise ValueError("notification_id must not be 0 for foreground services (Android constraint)")
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
@@ -1166,14 +935,7 @@ class FletAndroidNotifications(ft.Service):
         return self._check_error(result)
 
     async def get_active_notifications(self) -> list[dict]:
-        """Get all currently active (shown) notifications.
-
-        Returns:
-            List of dicts with keys: id, title, body, channel_id, payload.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Return active notification dictionaries containing id, title, body, channel_id and payload. Native failures raise NotificationError."""
         result = await self._invoke_method(
             method_name="get_active_notifications",
         )
@@ -1202,18 +964,7 @@ class FletAndroidNotifications(ft.Service):
             raise NotificationError(f"failed to parse response: {e}")
 
     async def get_notification_app_launch_details(self) -> dict:
-        """Check whether the app was launched by tapping a notification.
-
-        Returns:
-            Dict with "did_notification_launch_app" (bool) and
-            "notification_response" (dict or None). When the app was launched
-            from a notification, the response holds the same fields as the
-            on_notification_tap event data: notification_id, payload,
-            action_id, input, response_type.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Return did_notification_launch_app and notification_response, including notification_id, payload, action_id, input and response_type. Native failures raise NotificationError."""
         result = await self._invoke_method(
             method_name="get_notification_app_launch_details",
         )
@@ -1261,101 +1012,41 @@ class FletAndroidNotifications(ft.Service):
         return self._check_error(result) == "true"
 
     async def request_exact_alarm_permission(self):
-        """Request the SCHEDULE_EXACT_ALARM permission (Android 14+).
-
-        Required before using exact schedule modes ("alarm_clock", "exact",
-        "exact_allow_while_idle"). Inexact modes do not need this permission.
-
-        Returns:
-            bool: True if granted, False if denied.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Request exact-alarm access; return whether granted. Exact scheduling modes require it; inexact modes do not. Native failures raise NotificationError."""
         result = await self._invoke_method(
             method_name="request_exact_alarm_permission",
         )
         return self._check_error(result) == "true"
 
     async def are_notifications_enabled(self) -> bool:
-        """Whether notifications are enabled for this app (POST_NOTIFICATIONS).
-
-        Use this instead of assuming a notification was suppressed by the OEM —
-        if this returns False, the user has notifications turned off.
-
-        Returns:
-            bool: True if notifications are enabled.
-        """
+        """Return whether this app can post notifications. False indicates disabled notifications, not necessarily an OEM restriction."""
         result = await self._invoke_method(method_name="are_notifications_enabled")
         return self._check_error(result) == "true"
 
     async def open_app_notification_settings(self) -> bool:
-        """Open Android's notification settings screen for this app.
-
-        This lets a user re-enable notifications or adjust the app's notification
-        channels after :meth:`are_notifications_enabled` returns ``False``.
-
-        Returns:
-            bool: True if Android opened the settings screen.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Open this app's notification settings to enable notifications or adjust channels. Return whether Android opened settings; native failures raise NotificationError."""
         result = await self._invoke_method(
             method_name="open_app_notification_settings"
         )
         return self._check_error(result) == "true"
 
     async def can_schedule_exact_notifications(self) -> bool:
-        """Whether the app may schedule exact alarms (SCHEDULE_EXACT_ALARM).
-
-        Exact schedule modes ("alarm_clock", "exact", "exact_allow_while_idle")
-        require this. If False, call request_exact_alarm_permission() or fall
-        back to an inexact schedule_mode.
-
-        Returns:
-            bool: True if exact alarms can be scheduled.
-        """
+        """Return whether exact alarms are allowed. Otherwise request_exact_alarm_permission() or use an inexact scheduling mode."""
         result = await self._invoke_method(method_name="can_schedule_exact_notifications")
         return self._check_error(result) == "true"
 
     async def request_full_screen_intent_permission(self) -> bool:
-        """Request the USE_FULL_SCREEN_INTENT permission (Android 14+).
-
-        Required for full_screen_intent notifications to launch their
-        full-screen UI on Android 14+. The USE_FULL_SCREEN_INTENT permission
-        must also be declared in the app manifest.
-
-        Returns:
-            bool: True if granted.
-        """
+        """Request full-screen intent access on Android 14+. The manifest must declare USE_FULL_SCREEN_INTENT. Return whether access is granted."""
         result = await self._invoke_method(method_name="request_full_screen_intent_permission")
         return self._check_error(result) == "true"
 
     async def has_notification_policy_access(self) -> bool:
-        """Whether the app has notification-policy (do-not-disturb) access.
-
-        A channel's channel_bypass_dnd only takes effect when this is True;
-        without policy access Android treats bypass as False. Use this to tell
-        whether a DND-bypass failure is a missing grant rather than an OEM issue.
-
-        Returns:
-            bool: True if notification-policy access is granted.
-        """
+        """Return whether notification-policy access is granted. Channel DND bypass requires this access."""
         result = await self._invoke_method(method_name="has_notification_policy_access")
         return self._check_error(result) == "true"
 
     async def request_notification_policy_access(self) -> bool:
-        """Open the system do-not-disturb (Zen) access screen for this app.
-
-        Opens Settings so the user can grant notification-policy access (needed
-        for channel_bypass_dnd). The returned bool is the plugin's raw result
-        and is NOT a reliable "opened" indicator — verify the grant afterwards
-        with has_notification_policy_access().
-
-        Returns:
-            bool: Plugin result (do not interpret as "settings opened").
-        """
+        """Open DND access settings. The returned plugin result does not confirm access or successful navigation; verify using has_notification_policy_access()."""
         result = await self._invoke_method(method_name="request_notification_policy_access")
         return self._check_error(result) == "true"
 
@@ -1374,28 +1065,7 @@ class FletAndroidNotifications(ft.Service):
         show_badge: bool = True,
         channel_bypass_dnd: bool = False,
     ):
-        """Create (or update) a notification channel up front.
-
-        A channel's sound/vibration/importance are immutable after creation, so
-        to change them you must delete_notification_channel() and recreate with a
-        new configuration (the channel_id may be reused once deleted).
-
-        Args:
-            channel_id: Channel ID.
-            channel_name: Human-readable channel name.
-            channel_description: Channel description shown in system settings.
-            group_id: Optional channel group ID (see create_notification_channel_group).
-            importance: One of "none", "min", "low", "default", "high", "max".
-            play_sound: Whether the channel plays a sound.
-            sound: Raw resource name for a custom sound (omit extension).
-            enable_vibration: Whether the channel vibrates.
-            vibration_pattern: Custom vibration pattern (list of ms durations).
-            show_badge: Whether the channel shows an app-icon badge.
-            channel_bypass_dnd: Whether the channel bypasses do-not-disturb.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Create a channel. Sound, vibration and importance persist per channel ID; use a new ID for changed behavior. Native failures raise NotificationError."""
         _validate_enum(importance, _VALID_IMPORTANCES, "importance")
         result = await self._invoke_method(
             method_name="create_notification_channel",
@@ -1416,14 +1086,7 @@ class FletAndroidNotifications(ft.Service):
         return self._check_error(result)
 
     async def delete_notification_channel(self, channel_id: str):
-        """Delete a notification channel by ID.
-
-        Use this to change an immutable channel property (sound, vibration,
-        importance): delete then recreate with create_notification_channel().
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Delete a channel by ID. Native failures raise NotificationError."""
         result = await self._invoke_method(
             method_name="delete_notification_channel",
             arguments={"channel_id": channel_id},
@@ -1431,15 +1094,7 @@ class FletAndroidNotifications(ft.Service):
         return self._check_error(result)
 
     async def get_notification_channels(self) -> list[dict]:
-        """Get all notification channels registered by this app.
-
-        Returns:
-            List of dicts with keys: id, name, description, importance (int),
-            play_sound, enable_vibration, bypass_dnd, show_badge.
-
-        Raises:
-            NotificationError: If the native side reports an error.
-        """
+        """Return channel dictionaries with id, name, description, importance, play_sound, enable_vibration, bypass_dnd and show_badge. Native failures raise NotificationError."""
         result = await self._invoke_method(method_name="get_notification_channels")
         self._check_error(result)
         try:

@@ -1,8 +1,4 @@
-"""Render the demo's reference-inspired speech-bubble symbol (Pillow required).
-
-Run: uv run --no-sync --with pillow python test_resources/generate_issue7_icon.py
-This is a demo approximation, not an extracted or official Bot Commander asset.
-"""
+"""Render an approximate demo speech-bubble icon using Pillow; this is not an official Bot Commander asset."""
 
 from pathlib import Path
 
@@ -23,8 +19,7 @@ def main():
     image.resize((256, 256), Image.Resampling.LANCZOS).save(
         root / "test_resources" / "ic_issue7_bot.png"
     )
-    # Android adaptive icons crop their outer region. Keep the symbol in its
-    # safe zone; this asset affects only the demo app, never the library.
+    # Keep this demo-only symbol inside the adaptive icon's safe zone.
     assets = root / "assets"
     assets.mkdir(exist_ok=True)
     launcher = Image.new("RGBA", (1024, 1024), ink)

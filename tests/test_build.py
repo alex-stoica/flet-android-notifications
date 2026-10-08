@@ -118,6 +118,24 @@ def test_dart_copy_excludes_tests_and_generated_files(project, monkeypatch):
     assert not (destination / ".dart_tool").exists()
 
 
+@pytest.mark.parametrize("modern", [False, True])
+def test_rebuild_passes_runtime_paths_without_requiring_modern_layout(project, monkeypatch, modern):
+    (project / "build/site-packages").mkdir(parents=True)
+    if modern:
+        (project / "build/python-app").mkdir()
+        (project / "build/.python-version").write_text("3.14\n")
+    monkeypatch.delenv("SERIOUS_PYTHON_APP", raising=False)
+    monkeypatch.delenv("SERIOUS_PYTHON_VERSION", raising=False)
+    monkeypatch.setattr(build, "_find_flutter", lambda: Path("flutter"))
+    calls = []
+    monkeypatch.setattr(build, "run", lambda *args, **kwargs: calls.append(kwargs))
+    build.step_flutter_build()
+    env = calls[0]["env"]
+    assert env["SERIOUS_PYTHON_SITE_PACKAGES"] == str(project / "build/site-packages")
+    assert env.get("SERIOUS_PYTHON_APP") == (str(project / "build/python-app") if modern else None)
+    assert env.get("SERIOUS_PYTHON_VERSION") == ("3.14" if modern else None)
+
+
 def test_install_preserves_data_and_does_not_launch_after_failure(project, monkeypatch):
     apk = build.BUILD_FLUTTER / "build/app/outputs/flutter-apk/app-release.apk"
     apk.parent.mkdir(parents=True)

@@ -206,25 +206,14 @@ All other notification parameters (channel, appearance, behavior, etc.) are the 
 - The notification is **not** removed by `cancel()` or `cancel_all()` — use `stop_foreground_service()`
 - Requires `FOREGROUND_SERVICE` permission plus a type-specific permission (e.g. `FOREGROUND_SERVICE_SPECIAL_USE`)
 
-**AndroidManifest.xml** — add inside `<application>`:
+Since 0.12.0, foreground services require explicit configuration:
 
-The package patcher can add this entry automatically.
-
-```xml
-<service android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
-    android:exported="false"
-    android:foregroundServiceType="specialUse" />
+```sh
+flet-android-notifications-patch --foreground-service-type specialUse --foreground-service-subtype "User-started notification demo with explicit stop"
 ```
 
-Adjust `foregroundServiceType` to match your use case (e.g. `location`, `mediaPlayback`).
-
-**pyproject.toml permissions:**
-
-```toml
-[tool.flet.android.permission]
-"android.permission.FOREGROUND_SERVICE" = true
-"android.permission.FOREGROUND_SERVICE_SPECIAL_USE" = true
-```
+Choose your app's service type and purpose. `specialUse` requires an explanation;
+omitted options preserve existing services.
 
 ### Dismissal on Android 14+
 

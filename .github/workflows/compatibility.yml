@@ -7,6 +7,7 @@ on:
       - "**/*.py"
       - "**/*.dart"
       - "**/pubspec.yaml"
+      - "**/pyproject.toml"
       - ".github/workflows/compatibility.yml"
   pull_request:
     branches: [master]
@@ -14,11 +15,16 @@ on:
       - "**/*.py"
       - "**/*.dart"
       - "**/pubspec.yaml"
+      - "**/pyproject.toml"
       - ".github/workflows/compatibility.yml"
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flet: ["0.82.0", "0.85.2", "latest"]
     steps:
       - uses: actions/checkout@v6
 
@@ -26,11 +32,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install package against latest flet
+      - name: Install matching Flet
+        id: versions
+        env:
+          FLET_VERSION: ${{ matrix.flet }}
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install flet pytest
-          python -m pip install ./flet_android_notifications
+          requirement=flet
+          if [ "$FLET_VERSION" != latest ]; then requirement="flet==$FLET_VERSION"; fi
+          python -m pip install "$requirement" pytest ./flet_android_notifications
+          python -c "from flet.version import version, flutter_version; print('flet=' + version); print('flutter=' + flutter_version)" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
         run: python -m pytest tests -q
@@ -38,11 +48,15 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.44.9"
+          flutter-version: ${{ steps.versions.outputs.flutter }}
 
       - name: Resolve Flutter extension dependencies
         working-directory: flet_android_notifications/src/flutter/flet_android_notifications
-        run: flutter pub get
+        env:
+          FLET_VERSION: ${{ steps.versions.outputs.flet }}
+        run: |
+          printf 'dependency_overrides:\n  flet: "%s"\n  jni: 1.1.0\n' "$FLET_VERSION" > pubspec_overrides.yaml
+          flutter pub get
 
       - name: Analyze Flutter extension
         working-directory: flet_android_notifications/src/flutter/flet_android_notifications

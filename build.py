@@ -1,12 +1,4 @@
-"""Automated build+deploy script for flet-android-notifications demo.
-
-Pipeline:
-  flet build apk
-    -> refresh staged Python sources (or legacy app.zip)
-    -> copy test resources into res/raw/
-    -> flutter build apk --release
-    -> adb install -r + launch
-"""
+"""Build, patch and deploy the notification demo, refreshing staged Python, Dart and Android resources before rebuilding."""
 
 import hashlib
 import os
@@ -68,7 +60,9 @@ def run(cmd, cwd=None, env=None):
 
 
 def step_flet_build():
-    """Step 1: run flet build apk."""
+    """Generate the Flutter app."""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     print("\n=== Step 1: flet build apk ===")
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     with subprocess.Popen(
@@ -96,16 +90,15 @@ def step_flet_build():
 
 
 def step_patch_manifest():
-    """Step 1b: inject flutter_local_notifications receivers + foreground service into AndroidManifest.
-
-    Required for schedule_notification, periodically_show, and foreground service to fire/run
-    at all — not just to survive reboots. flet build wipes AndroidManifest.xml each run.
-    """
+    """Configure receivers and the demo's foreground notification service."""
     print("\n=== Step 1b: patch AndroidManifest.xml ===")
     if not ANDROID_MANIFEST.exists():
         print(f"ERROR: {ANDROID_MANIFEST} not found. Run flet build first.")
         sys.exit(1)
-    changed = patch_manifest_file(ANDROID_MANIFEST)
+    changed = patch_manifest_file(
+        ANDROID_MANIFEST, foreground_service_type="specialUse",
+        foreground_service_subtype="User-started notification feature demonstrations with an explicit stop action",
+    )
     print(f"  {'injected receivers + foreground service into' if changed else 'already patched'} {ANDROID_MANIFEST.name}")
 
 
@@ -301,8 +294,7 @@ def step_copy_dart_source():
 def step_flutter_build():
     """Step 6: flutter build apk --release."""
     print("\n=== Step 6: flutter build apk --release ===")
-    # SERIOUS_PYTHON_SITE_PACKAGES must point to the parent of arch dirs (arm64-v8a/, etc.)
-    # flet build creates this at build/site-packages/
+    # Point to architecture directories, not an individual architecture.
     site_packages = ROOT / "build" / "site-packages"
     if not site_packages.exists():
         print(f"ERROR: {site_packages} not found. Run flet build first.")
@@ -310,6 +302,12 @@ def step_flutter_build():
 
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     env["SERIOUS_PYTHON_SITE_PACKAGES"] = str(site_packages)
+    staged = ROOT / "build" / "python-app"
+    if staged.is_dir():
+        env["SERIOUS_PYTHON_APP"] = str(staged.resolve())
+    python_version = ROOT / "build" / ".python-version"
+    if python_version.exists():
+        env["SERIOUS_PYTHON_VERSION"] = python_version.read_text().strip()
     print(f"  SERIOUS_PYTHON_SITE_PACKAGES={site_packages}")
 
     run([str(_find_flutter()), "build", "apk", "--release"], cwd=str(BUILD_FLUTTER), env=env)

@@ -1,13 +1,8 @@
-"""Fixture tests for the AndroidManifest.xml / build.gradle.kts patcher.
-
-The patcher does sentinel-string text insertion on the Flet-generated Android template, which is
-brittle if the template shape changes. These tests pin the expected behavior against representative
-fixtures so a template/plugin change that breaks patching is caught here instead of mid-build.
-
-Runs under pytest (uses the tmp_path fixture) or standalone: `python tests/test_patcher.py`.
-"""
+"""Check manifest updates and Gradle configuration against generated Android fixtures."""
 
 import sys
+import xml.etree.ElementTree as ET
+import pytest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +47,8 @@ _REQUIRED = (
 def test_manifest_injects_all_required_entries(tmp_path):
     m = tmp_path / "AndroidManifest.xml"
     m.write_text(MANIFEST, encoding="utf-8")
-    assert patch_manifest_file(m) is True
+    assert patch_manifest_file(m, foreground_service_type="specialUse",
+                               foreground_service_subtype="User-started demonstration") is True
     text = m.read_text(encoding="utf-8")
     for sentinel in _REQUIRED:
         assert sentinel in text, f"missing {sentinel}"
@@ -60,6 +56,7 @@ def test_manifest_injects_all_required_entries(tmp_path):
     assert ".MainActivity" in text
     assert 'android:foregroundServiceType="specialUse"' in text
     assert text.index("ForegroundService") < text.index("</application>")
+    assert patch_manifest_file(m, foreground_service_type="specialUse") is False
 
 
 def test_manifest_idempotent(tmp_path):
@@ -107,6 +104,49 @@ def test_manifest_custom_foreground_service_type(tmp_path):
     assert 'android:foregroundServiceType="location"' in m.read_text(encoding="utf-8")
 
 
+def test_default_preserves_existing_service_without_creating_one(tmp_path):
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(MANIFEST)
+    patch_manifest_file(path)
+    assert "ForegroundService" not in path.read_text()
+    patch_manifest_file(path, foreground_service_type="location")
+    assert patch_manifest_file(path) is False
+    assert 'foregroundServiceType="location"' in path.read_text()
+
+
+def test_service_type_change_preserves_other_components(tmp_path):
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(MANIFEST.replace("</application>", '<service android:name="other.Service" /></application>'))
+    patch_manifest_file(path, foreground_service_type="specialUse", foreground_service_subtype="Timer demonstration")
+    assert patch_manifest_file(path, foreground_service_type="location|microphone")
+    text = path.read_text()
+    assert 'foregroundServiceType="location|microphone"' in text
+    assert "PROPERTY_SPECIAL_USE_FGS_SUBTYPE" not in text
+    assert 'android:name="other.Service"' in text
+    assert "android.permission.FOREGROUND_SERVICE_LOCATION" in text
+    assert "android.permission.FOREGROUND_SERVICE_MICROPHONE" in text
+    assert not patch_manifest_file(path, foreground_service_type="location|microphone")
+
+
+def test_special_use_explanation_updates_and_escapes(tmp_path):
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(MANIFEST)
+    for explanation in ("Timer demo", 'User starts A & B "timers"'):
+        assert patch_manifest_file(path, foreground_service_type="specialUse", foreground_service_subtype=explanation)
+        prop = ET.parse(path).find("application/service/property")
+        assert prop.get("{http://schemas.android.com/apk/res/android}value") == explanation
+        assert not patch_manifest_file(path, foreground_service_type="specialUse", foreground_service_subtype=explanation)
+
+
+@pytest.mark.parametrize("kind,subtype", [("specialUse", ""), ("specialUse", "  "), ("invalid", ""), ("", ""), (None, "unused")])
+def test_invalid_service_configuration_leaves_file_untouched(tmp_path, kind, subtype):
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(MANIFEST)
+    with pytest.raises(ValueError):
+        patch_manifest_file(path, foreground_service_type=kind, foreground_service_subtype=subtype)
+    assert path.read_text() == MANIFEST
+
+
 def test_gradle_enables_desugaring_multidex_and_dependency(tmp_path):
     g = tmp_path / "build.gradle.kts"
     g.write_text(GRADLE, encoding="utf-8")
@@ -137,22 +177,3 @@ def test_gradle_without_compileoptions_block(tmp_path):
     text = g.read_text(encoding="utf-8")
     assert "compileOptions {" in text
     assert "isCoreLibraryDesugaringEnabled = true" in text
-
-
-if __name__ == "__main__":
-    import tempfile
-    import traceback
-
-    failures = 0
-    for _name, _fn in sorted(globals().items()):
-        if _name.startswith("test_") and callable(_fn):
-            _dir = Path(tempfile.mkdtemp())
-            try:
-                _fn(_dir)
-                print(f"PASS {_name}")
-            except Exception:
-                failures += 1
-                print(f"FAIL {_name}")
-                traceback.print_exc()
-    print(f"\n{'OK' if not failures else 'FAILURES: ' + str(failures)}")
-    raise SystemExit(1 if failures else 0)

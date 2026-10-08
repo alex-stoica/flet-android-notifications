@@ -1,8 +1,4 @@
-"""Contract tests for the notification style payloads sent to Dart.
-
-Pins the to_dict() shapes so a Python-side rename can't silently desync from
-the Dart parser in notifications_service.dart.
-"""
+"""Check Python notification style payloads against the Dart parser contract."""
 
 import sys
 from datetime import datetime, timezone
